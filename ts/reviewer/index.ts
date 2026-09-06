@@ -143,11 +143,36 @@ const renderError = (type: string) => (error: unknown): string => {
     );
 };
 
+const cardFlipHalfDurationMs = 170;
+
+function cardFlipEnabled(): boolean {
+    return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+async function flipCardOut(qa: HTMLElement): Promise<void> {
+    qa.classList.remove("review-card-flip-in");
+    qa.classList.add("review-card-flip-out");
+    await new Promise((resolve) => setTimeout(resolve, cardFlipHalfDurationMs));
+}
+
+function flipCardIn(qa: HTMLElement): void {
+    qa.classList.remove("review-card-flip-out");
+    qa.classList.add("review-card-flip-in");
+    qa.style.opacity = "1";
+
+    // Two frames guarantee the edge-on state is painted before transitioning
+    // back to the resting face.
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => qa.classList.remove("review-card-flip-in"));
+    });
+}
+
 export async function _updateQA(
     html: string,
     _unusused: unknown,
     onupdate: Callback,
     onshown: Callback,
+    animateFlip = false,
 ): Promise<void> {
     onUpdateHook.length = 0;
     onUpdateHook.push(onupdate);
@@ -156,6 +181,7 @@ export async function _updateQA(
     onShownHook.push(onshown);
 
     const qa = document.getElementById("qa")!;
+    const shouldFlip = animateFlip && cardFlipEnabled() && qa.hasChildNodes();
 
     const containsMathJax = _containsMathjax(html);
     if (containsMathJax) {
@@ -167,6 +193,9 @@ export async function _updateQA(
     }
     await preloadResources(html);
 
+    if (shouldFlip) {
+        await flipCardOut(qa);
+    }
     qa.style.opacity = "0";
 
     try {
@@ -192,7 +221,11 @@ export async function _updateQA(
             .catch(renderError("MathJax"));
     }
 
-    qa.style.opacity = "1";
+    if (shouldFlip) {
+        flipCardIn(qa);
+    } else {
+        qa.style.opacity = "1";
+    }
 
     await _runHook(onShownHook);
 }
@@ -246,6 +279,7 @@ export function _showAnswer(a: string, bodyclass: string): void {
             function() {
                 /* noop */
             },
+            true,
         )
     );
 }
