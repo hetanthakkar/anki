@@ -4,6 +4,7 @@
 pub mod collection;
 pub mod error;
 pub mod http_client;
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 pub mod http_server;
 pub mod login;
 pub mod media;
