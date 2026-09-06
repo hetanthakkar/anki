@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { PwaRegister } from "@/components/PwaRegister";
 
 import "./globals.css";
+import "./magoosh-theme.css";
 
 export const metadata: Metadata = {
   title: "Anki PWA",
@@ -23,7 +24,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#1f6fd1"
+  themeColor: "#4b286d"
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
