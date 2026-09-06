@@ -11,6 +11,7 @@ description = "Anki's Rust library code"
 
 [features]
 bench = ["criterion"]
+browser-wasm = []
 rustls = ["reqwest/rustls-tls", "reqwest/rustls-tls-native-roots"]
 native-tls = ["reqwest/native-tls"]
 
@@ -90,7 +91,6 @@ rand.workspace = true
 rayon.workspace = true
 regex.workspace = true
 reqwest.workspace = true
-rusqlite.workspace = true
 rustls-pemfile.workspace = true
 same-file.workspace = true
 scopeguard.workspace = true
@@ -115,6 +115,12 @@ unicase.workspace = true
 unicode-normalization.workspace = true
 zip.workspace = true
 zstd.workspace = true
+
+[target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dependencies]
+rusqlite.workspace = true
+
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
+rusqlite = { version = "0.40.2", default-features = false, features = ["trace", "functions", "collation", "ffi-sqlite-wasm-rs"] }
 
 [target.'cfg(windows)'.dependencies]
 windows.workspace = true
