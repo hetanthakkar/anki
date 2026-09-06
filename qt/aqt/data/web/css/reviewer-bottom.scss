@@ -82,3 +82,236 @@ button {
         border-top-color: color(border-subtle);
     }
 }
+
+// Match the review webview's violet canvas so the controls read as one
+// focused flashcard experience rather than a separate desktop toolbar.
+body {
+    padding: 0 16px 18px;
+    box-sizing: border-box;
+    background: #522477 !important;
+}
+
+body.nightMode {
+    background: #1d1427 !important;
+}
+
+#outer {
+    width: min(100%, 980px);
+    margin: 0 auto;
+    border-top: 0;
+}
+
+#innertable {
+    width: 100%;
+    border-spacing: 10px 0;
+}
+
+#middle {
+    padding: 10px;
+    background: #fff;
+    border: 1px solid rgba(35, 22, 47, 0.1);
+    border-radius: 12px;
+    box-shadow:
+        0 18px 42px rgba(26, 10, 41, 0.16),
+        0 3px 10px rgba(26, 10, 41, 0.1);
+}
+
+.nightMode #middle {
+    background: #28222f;
+    border-color: rgba(255, 255, 255, 0.09);
+    box-shadow:
+        0 18px 42px rgba(0, 0, 0, 0.28),
+        0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+#middle > * {
+    animation: reviewer-controls-in 180ms ease-out;
+}
+
+#middle center,
+#middle center > table,
+#middle center > table > tbody,
+#middle center > table > tbody > tr {
+    width: 100%;
+}
+
+#middle center > table > tbody > tr {
+    display: flex;
+    gap: 8px;
+}
+
+#middle center > table > tbody > tr > td {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 !important;
+}
+
+#middle button {
+    box-sizing: border-box;
+    min-height: 50px;
+    margin: 0;
+    padding: 10px 16px;
+    border: 1px solid #d7d4dc;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 650;
+    line-height: 1.15;
+    transition:
+        transform 120ms ease,
+        box-shadow 120ms ease,
+        filter 120ms ease;
+}
+
+#middle button:hover {
+    filter: brightness(0.985);
+    transform: translateY(-1px);
+    box-shadow: 0 5px 12px rgba(32, 18, 45, 0.12);
+}
+
+#middle button:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+#middle button:focus-visible {
+    outline: 3px solid var(--focus-color);
+    outline-offset: 2px;
+}
+
+// Anki's native four ratings, presented as clear full-width choices.
+#middle button[data-ease="1"] {
+    color: #a61b1b;
+    background: #fee8e8;
+    border-color: #f2b6b6;
+}
+
+#middle button[data-ease="2"] {
+    color: #8a5200;
+    background: #fff2d6;
+    border-color: #ebcc8d;
+}
+
+#middle button[data-ease="3"] {
+    color: #126b3a;
+    background: #ddf6e8;
+    border-color: #a7ddbd;
+}
+
+#middle button[data-ease="4"] {
+    color: #1f5f9c;
+    background: #e2f0ff;
+    border-color: #b2d2f2;
+}
+
+.nightMode #middle button[data-ease="1"] {
+    color: #ffb2b2;
+    background: #4a2428;
+    border-color: #6b3439;
+}
+
+.nightMode #middle button[data-ease="2"] {
+    color: #ffd58b;
+    background: #49371d;
+    border-color: #6d5229;
+}
+
+.nightMode #middle button[data-ease="3"] {
+    color: #a9e9c3;
+    background: #1f432f;
+    border-color: #326348;
+}
+
+.nightMode #middle button[data-ease="4"] {
+    color: #b7d9ff;
+    background: #203b58;
+    border-color: #315779;
+}
+
+// Intervals/counts become secondary text inside each choice instead of
+// floating above the row as they do in the legacy toolbar.
+#middle .nobold,
+#middle .stattxt {
+    position: static;
+    display: block;
+    margin-top: 5px;
+    transform: none;
+    font-size: 11px;
+    line-height: 1.1;
+    font-weight: 500;
+    opacity: 0.72;
+}
+
+#ansbut {
+    width: min(440px, 100%);
+    color: #4c4652;
+    background: #f5f4f7;
+    border-color: #d8d4dd !important;
+}
+
+.nightMode #ansbut {
+    color: #f0ebf3;
+    background: #342d3b;
+    border-color: #4b4254 !important;
+}
+
+.stat > button {
+    margin: 9px 4px;
+    color: rgba(255, 255, 255, 0.88);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 7px;
+}
+
+.stat .stattxt {
+    color: rgba(255, 255, 255, 0.82);
+}
+
+@keyframes reviewer-controls-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 640px) {
+    body {
+        padding: 0 10px 12px;
+    }
+
+    #innertable {
+        border-spacing: 0;
+    }
+
+    #middle {
+        padding: 8px;
+        border-radius: 10px;
+    }
+
+    #middle center > table > tbody > tr {
+        flex-wrap: wrap;
+    }
+
+    #middle center > table > tbody > tr > td {
+        flex: 1 1 calc(50% - 4px);
+    }
+
+    #middle button {
+        width: 100%;
+        min-height: 48px;
+        padding: 9px 10px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #middle > * {
+        animation: none;
+    }
+
+    #middle button {
+        transition: none;
+    }
+}
