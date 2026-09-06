@@ -1,0 +1,23 @@
+name: PWA WASM core
+
+on:
+  push:
+    branches: [anki-mobile-ui]
+    paths:
+      - "rslib/**"
+      - "pwa/wasm-core/**"
+      - ".github/workflows/pwa-wasm.yml"
+  workflow_dispatch:
+
+jobs:
+  wasm-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add browser WASM target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Check Anki browser bridge
+        run: cargo check --manifest-path pwa/wasm-core/Cargo.toml --target wasm32-unknown-unknown
