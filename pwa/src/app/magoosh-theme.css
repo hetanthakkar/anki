@@ -1,0 +1,321 @@
+:root {
+  --magoosh-purple-950: #2f1747;
+  --magoosh-purple-900: #3d2059;
+  --magoosh-purple-800: #4b286d;
+  --magoosh-purple-700: #5d347f;
+  --magoosh-purple-100: #f1eafa;
+  --magoosh-purple-50: #f8f5fc;
+  --magoosh-green: #58a942;
+  --magoosh-green-dark: #438733;
+  --magoosh-ink: #24212a;
+  --magoosh-muted: #77717f;
+  --magoosh-line: #e9e3ee;
+  --magoosh-surface: #ffffff;
+  --magoosh-background: #f6f3f8;
+
+  --anki-blue: var(--magoosh-purple-700);
+  --anki-nav: var(--magoosh-purple-800);
+  --anki-line: var(--magoosh-line);
+  --anki-bg: var(--magoosh-background);
+  --anki-grouped: var(--magoosh-background);
+  --anki-secondary: var(--magoosh-muted);
+  --anki-new: #3f78c5;
+  --anki-learn: #d36a4b;
+  --anki-review: var(--magoosh-green);
+}
+
+html,
+body {
+  background: #ece7f0;
+}
+
+.anki-mobile-app {
+  background: var(--magoosh-background);
+  box-shadow: 0 18px 60px rgba(47, 23, 71, 0.16);
+}
+
+.anki-screen {
+  background: var(--magoosh-background);
+}
+
+.anki-nav-bar {
+  border-bottom: 0;
+  background: rgba(75, 40, 109, 0.98);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px) saturate(130%);
+}
+
+.anki-nav-title {
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.anki-text-button,
+.anki-nav-side button,
+.study-nav-actions button,
+.text-size-tools button,
+.anki-icon-button {
+  color: #fff;
+}
+
+.deck-table {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: transparent;
+}
+
+.mobile-deck-row {
+  min-height: 68px;
+  padding: 13px 15px 13px 17px;
+  border: 1px solid var(--magoosh-line);
+  border-radius: 14px;
+  background: var(--magoosh-surface);
+  box-shadow: 0 2px 8px rgba(47, 23, 71, 0.055);
+}
+
+.mobile-deck-row:active,
+.browser-row:active,
+.settings-group button:active,
+.editor-options button:active {
+  background: var(--magoosh-purple-50);
+}
+
+.mobile-deck-title {
+  color: var(--magoosh-ink);
+  font-weight: 650;
+}
+
+.mobile-deck-counts {
+  gap: 2px;
+}
+
+.deck-review-count,
+.count-review {
+  color: var(--magoosh-green-dark);
+}
+
+.deck-new-count,
+.count-new {
+  color: var(--magoosh-purple-700);
+}
+
+.anki-bottom-toolbar,
+.study-bottom {
+  border-color: var(--magoosh-line);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 -4px 18px rgba(47, 23, 71, 0.06);
+}
+
+.anki-bottom-text {
+  color: var(--magoosh-purple-700);
+  font-weight: 650;
+}
+
+.sheet-backdrop {
+  background: rgba(39, 28, 46, 0.42);
+  backdrop-filter: blur(3px);
+}
+
+.sheet-group,
+.sheet-cancel {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16px 50px rgba(34, 20, 45, 0.25);
+}
+
+.sheet-group button,
+.sheet-cancel {
+  border-bottom-color: var(--magoosh-line);
+  color: var(--magoosh-purple-700);
+}
+
+.review-card-area {
+  padding: 26px 18px;
+  background: var(--magoosh-background);
+}
+
+.review-card-content {
+  width: min(100%, 540px);
+  padding: clamp(30px, 8vw, 54px) clamp(22px, 7vw, 44px);
+  border: 1px solid var(--magoosh-line);
+  border-radius: 22px;
+  background: var(--magoosh-surface);
+  box-shadow: 0 10px 34px rgba(47, 23, 71, 0.08);
+}
+
+.review-prompt {
+  color: var(--magoosh-ink);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.review-card-content hr {
+  border-top-color: var(--magoosh-line);
+}
+
+.review-answer {
+  color: var(--magoosh-purple-800);
+  font-weight: 650;
+}
+
+.review-example {
+  color: var(--magoosh-muted);
+}
+
+.show-answer-button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--magoosh-purple-700);
+  box-shadow: 0 4px 12px rgba(75, 40, 109, 0.2);
+  color: #fff;
+  font-weight: 700;
+}
+
+.answer-grid {
+  gap: 7px;
+  padding: 8px 9px 6px;
+}
+
+.answer-button {
+  min-height: 52px;
+  border: 1px solid var(--magoosh-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 7px rgba(47, 23, 71, 0.045);
+  font-weight: 700;
+}
+
+.answer-button.again {
+  color: #bb443d;
+}
+
+.answer-button.hard {
+  color: #b66c25;
+}
+
+.answer-button.good {
+  border-color: rgba(88, 169, 66, 0.35);
+  background: #f4faf1;
+  color: var(--magoosh-green-dark);
+}
+
+.answer-button.easy {
+  color: var(--magoosh-purple-700);
+}
+
+.browse-controls {
+  padding: 10px 12px;
+  border-bottom: 0;
+  background: var(--magoosh-background);
+}
+
+.search-field {
+  height: 40px;
+  border: 1px solid var(--magoosh-line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.browse-toolbar {
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.browse-toolbar button {
+  min-height: 34px;
+  border: 1px solid var(--magoosh-line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--magoosh-purple-700);
+}
+
+.browser-table {
+  margin: 0 12px 16px;
+  overflow: hidden;
+  border: 1px solid var(--magoosh-line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(47, 23, 71, 0.05);
+}
+
+.browser-header {
+  border-bottom-color: var(--magoosh-line);
+  background: var(--magoosh-purple-50);
+  color: var(--magoosh-purple-800);
+}
+
+.browser-row {
+  border-bottom-color: var(--magoosh-line);
+}
+
+.editor-screen,
+.list-screen,
+.grouped-screen {
+  background: var(--magoosh-background);
+}
+
+.editor-options,
+.field-editor,
+.settings-group,
+.stats-summary,
+.chart-card,
+.frequent-actions {
+  overflow: hidden;
+  margin-right: 14px;
+  margin-left: 14px;
+  border: 1px solid var(--magoosh-line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(47, 23, 71, 0.045);
+}
+
+.editor-options button,
+.settings-group button {
+  border-bottom-color: var(--magoosh-line);
+  background: #fff;
+}
+
+.settings-section h2 {
+  color: var(--magoosh-purple-800);
+  font-weight: 750;
+}
+
+.ios-switch.on {
+  background: var(--magoosh-green);
+}
+
+.stats-summary > strong {
+  color: var(--magoosh-purple-800);
+}
+
+.bar-chart span {
+  background: var(--magoosh-purple-700);
+}
+
+.anki-mark {
+  background: var(--magoosh-purple-700);
+  box-shadow: 0 8px 24px rgba(75, 40, 109, 0.2);
+}
+
+@media (max-width: 430px) {
+  .deck-table {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .mobile-deck-row {
+    border-radius: 12px;
+  }
+
+  .review-card-area {
+    padding: 18px 12px;
+  }
+
+  .review-card-content {
+    border-radius: 18px;
+  }
+}
