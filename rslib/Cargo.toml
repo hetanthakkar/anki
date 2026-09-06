@@ -108,7 +108,6 @@ unic-ucd-category.workspace = true
 unicase.workspace = true
 unicode-normalization.workspace = true
 zip.workspace = true
-zstd.workspace = true
 
 [target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dependencies]
 axum.workspace = true
@@ -118,10 +117,14 @@ hyper.workspace = true
 rusqlite = { workspace = true, features = ["bundled"] }
 tokio.workspace = true
 tower-http.workspace = true
+zstd.workspace = true
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
+getrandom03 = { package = "getrandom", version = "0.3.4", features = ["wasm_js"] }
+getrandom04 = { package = "getrandom", version = "0.4.3", features = ["wasm_js"] }
 rusqlite = { workspace = true, features = ["ffi-sqlite-wasm-rs"] }
 tokio = { version = "1.45", default-features = false, features = ["rt", "macros", "time", "sync", "io-util"] }
+zstd = { version = "0.13.3" }
 
 [target.'cfg(windows)'.dependencies]
 windows.workspace = true
