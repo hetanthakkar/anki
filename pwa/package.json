@@ -9,7 +9,9 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "wasm:check": "cargo check --manifest-path wasm-core/Cargo.toml --target wasm32-unknown-unknown",
+    "wasm:build": "bash scripts/build-anki-wasm.sh"
   },
   "dependencies": {
     "next": "16.3.4",
