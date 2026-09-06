@@ -1,8 +1,17 @@
 :root {
-  color-scheme: light dark;
-  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #f5f6f8;
-  color: #17191c;
+  color-scheme: light;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  background: #d8dce2;
+  color: #111214;
+  --anki-blue: #007aff;
+  --anki-nav: #f8f8fa;
+  --anki-line: #c7c7cc;
+  --anki-bg: #ffffff;
+  --anki-grouped: #f2f2f7;
+  --anki-secondary: #6d6d72;
+  --anki-new: #0088cc;
+  --anki-learn: #d64045;
+  --anki-review: #2f9e44;
 }
 
 * {
@@ -13,7 +22,11 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  background: #f5f6f8;
+  background: #d8dce2;
+}
+
+body {
+  min-height: 100dvh;
 }
 
 button,
@@ -27,234 +40,883 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
-.app-shell {
-  width: min(100%, 760px);
+button,
+input,
+textarea {
+  appearance: none;
+}
+
+.anki-mobile-app {
+  width: min(100%, 680px);
   min-height: 100dvh;
   margin: 0 auto;
-  padding: max(18px, env(safe-area-inset-top)) 18px calc(84px + env(safe-area-inset-bottom));
+  overflow: hidden;
+  background: var(--anki-bg);
+  box-shadow: 0 0 40px rgba(16, 24, 40, 0.14);
 }
 
-.top-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 22px;
+.anki-screen {
+  position: relative;
+  min-height: 100dvh;
+  background: var(--anki-bg);
 }
 
-.eyebrow {
-  margin: 0 0 3px;
-  color: #667085;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.13em;
-}
-
-h1 {
-  margin: 0;
-  font-size: clamp(30px, 8vw, 42px);
-  line-height: 1;
-  letter-spacing: -0.04em;
-}
-
-.top-actions {
-  display: flex;
-  align-items: center;
-}
-
-.icon-button {
-  width: 42px;
-  height: 42px;
-  border: 0;
-  border-radius: 13px;
-  background: #1f6fd1;
-  color: white;
-  font-size: 26px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.panel,
-.storage-banner,
-.deck-list {
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid #e7e9ee;
-  box-shadow: 0 8px 30px rgba(17, 24, 39, 0.05);
-}
-
-.panel {
-  border-radius: 16px;
-  padding: 18px;
-}
-
-.muted {
-  color: #667085;
-}
-
-.error-panel {
+.anki-nav-bar {
+  position: sticky;
+  z-index: 30;
+  top: 0;
   display: grid;
-  gap: 6px;
-  color: #9f1d1d;
+  grid-template-columns: minmax(72px, 1fr) auto minmax(72px, 1fr);
+  min-height: calc(48px + env(safe-area-inset-top));
+  align-items: end;
+  padding: env(safe-area-inset-top) 8px 6px;
+  border-bottom: 0.5px solid var(--anki-line);
+  background: rgba(248, 248, 250, 0.97);
+  backdrop-filter: blur(18px) saturate(180%);
 }
 
-.storage-banner {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-bottom: 12px;
-  padding: 11px 13px;
-  border-radius: 14px;
-  color: #475467;
-  font-size: 13px;
-}
-
-.storage-meta {
-  margin-left: auto;
-  color: #98a2b3;
-  font-size: 12px;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-}
-
-.status-dot.good {
-  background: #14a44d;
-}
-
-.status-dot.warning {
-  background: #d97706;
-}
-
-.deck-list {
+.anki-nav-title {
+  max-width: 210px;
+  margin: 0;
   overflow: hidden;
-  border-radius: 18px;
-}
-
-.deck-row {
-  display: flex;
-  width: 100%;
-  min-height: 64px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
-  border: 0;
-  border-bottom: 1px solid #eceef2;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.deck-row:last-child {
-  border-bottom: 0;
-}
-
-.deck-row:active {
-  background: #f0f4f9;
-}
-
-.deck-name {
-  overflow: hidden;
-  font-size: 16px;
-  font-weight: 650;
+  align-self: center;
+  color: #111214;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 34px;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.deck-counts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(28px, auto));
-  gap: 7px;
+.anki-nav-side {
+  display: flex;
+  min-width: 0;
+  min-height: 34px;
   align-items: center;
+  gap: 1px;
+}
+
+.anki-nav-left {
+  justify-content: flex-start;
+}
+
+.anki-nav-right {
+  justify-content: flex-end;
+}
+
+.anki-text-button,
+.anki-nav-side button,
+.study-nav-actions button,
+.text-size-tools button {
+  min-height: 34px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--anki-blue);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  padding-left: 0 !important;
+}
+
+.back-button > span {
+  margin-right: 2px;
+  font-size: 31px;
+  font-weight: 300;
+  line-height: 20px;
+}
+
+.save-button {
+  font-weight: 600;
+}
+
+.deck-top-actions,
+.study-nav-actions,
+.text-size-tools {
+  display: flex;
+  align-items: center;
+}
+
+.anki-icon-button {
+  display: inline-grid;
+  width: 31px;
+  height: 34px;
+  place-items: center;
+  padding: 0 !important;
+  border: 0;
+  background: transparent;
+  color: var(--anki-blue);
+  cursor: pointer;
+  font-size: 20px !important;
+  line-height: 1;
+}
+
+.deck-top-actions .anki-icon-button:first-child {
+  font-size: 18px !important;
+  font-weight: 600;
+}
+
+.deck-table {
+  width: 100%;
+  background: #fff;
+}
+
+.mobile-deck-row {
+  display: flex;
+  width: 100%;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px 8px 18px;
+  border: 0;
+  border-bottom: 0.5px solid #d1d1d6;
+  background: #fff;
+  color: #111214;
+  cursor: pointer;
+  text-align: left;
+}
+
+.mobile-deck-row:active,
+.browser-row:active,
+.settings-group button:active,
+.editor-options button:active {
+  background: #e9e9ed;
+}
+
+.mobile-deck-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-deck-counts {
+  display: grid;
+  min-width: 44px;
+  flex: 0 0 auto;
+  grid-template-rows: repeat(2, 1fr);
+  gap: 0;
+  padding-left: 14px;
+  font-size: 14px;
+  line-height: 18px;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-size: 13px;
-  font-weight: 700;
 }
 
-.new-count {
-  color: #2563eb;
+.deck-review-count {
+  color: var(--anki-review);
 }
 
-.learn-count {
-  color: #d97706;
+.deck-new-count {
+  color: var(--anki-new);
 }
 
-.review-count {
-  color: #16a34a;
+.deck-spacer {
+  min-height: 220px;
 }
 
-.bottom-nav {
+.anki-bottom-toolbar {
   position: fixed;
-  z-index: 10;
+  z-index: 30;
   right: 0;
   bottom: 0;
   left: 0;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  max-width: 760px;
+  display: flex;
+  width: min(100%, 680px);
+  min-height: calc(49px + env(safe-area-inset-bottom));
   margin: 0 auto;
-  padding: 9px 10px max(9px, env(safe-area-inset-bottom));
-  border-top: 1px solid #e3e6eb;
-  background: rgba(249, 250, 251, 0.94);
-  backdrop-filter: blur(16px);
+  align-items: flex-start;
+  border-top: 0.5px solid var(--anki-line);
+  background: rgba(248, 248, 250, 0.97);
+  backdrop-filter: blur(18px) saturate(180%);
 }
 
-.nav-item {
-  min-height: 42px;
+.deck-bottom-toolbar {
+  justify-content: space-between;
+}
+
+.anki-bottom-text {
+  min-height: 49px;
+  padding: 0 17px;
   border: 0;
-  border-radius: 10px;
   background: transparent;
-  color: #667085;
+  color: var(--anki-blue);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.sync-button {
+  font-weight: 500;
+}
+
+.sheet-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 12px 10px calc(12px + env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.anki-action-sheet {
+  width: min(100%, 520px);
+}
+
+.sheet-group,
+.sheet-cancel {
+  overflow: hidden;
+  width: 100%;
+  border-radius: 13px;
+  background: rgba(250, 250, 252, 0.98);
+}
+
+.sheet-group button,
+.sheet-cancel {
+  width: 100%;
+  min-height: 56px;
+  border: 0;
+  border-bottom: 0.5px solid #c8c8cc;
+  background: transparent;
+  color: var(--anki-blue);
+  font-size: 20px;
+}
+
+.sheet-group button:last-child {
+  border-bottom: 0;
+}
+
+.sheet-cancel {
+  margin-top: 8px;
+  border-bottom: 0;
+  background: #fff;
+  font-weight: 600;
+}
+
+/* Study */
+
+.study-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 100dvh;
+}
+
+.study-screen .anki-nav-bar {
+  flex: 0 0 auto;
+}
+
+.study-nav-actions button {
+  padding: 0 4px;
+  font-size: 14px;
+}
+
+.review-card-area {
+  display: grid;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  place-items: center;
+  padding: 30px 22px;
+  overflow-y: auto;
+  border: 0;
+  background: #fff;
+  color: #111;
+  cursor: pointer;
+}
+
+.review-card-content {
+  width: min(100%, 540px);
+  margin: auto;
+  text-align: center;
+}
+
+.review-card-content p {
+  margin: 0;
+}
+
+.review-prompt {
+  font-size: clamp(29px, 8vw, 40px);
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.review-card-content hr {
+  width: 100%;
+  margin: 26px 0 23px;
+  border: 0;
+  border-top: 1px solid #aaa;
+}
+
+.review-answer {
+  font-size: 28px;
+  line-height: 1.3;
+}
+
+.review-example {
+  margin-top: 18px !important;
+  color: #555;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.study-bottom {
+  flex: 0 0 auto;
+  border-top: 0.5px solid var(--anki-line);
+  background: rgba(248, 248, 250, 0.98);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.show-answer-button {
+  display: block;
+  width: calc(100% - 24px);
+  min-height: 43px;
+  margin: 8px 12px 6px;
+  border: 1px solid #aeb0b5;
+  border-radius: 5px;
+  background: linear-gradient(#fff, #eeeef0);
+  color: #111;
+  font-size: 17px;
+}
+
+.answer-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  padding: 6px 7px 4px;
+}
+
+.answer-button {
+  min-height: 47px;
+  padding: 3px 2px 5px;
+  border: 1px solid #a9a9ad;
+  border-radius: 5px;
+  background: linear-gradient(#fff, #ededf0);
+  color: #111;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.answer-button span {
+  display: block;
+  margin-bottom: 1px;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.answer-button.again {
+  color: #b62026;
+}
+
+.answer-button.hard {
+  color: #c26b00;
+}
+
+.answer-button.good {
+  color: #238636;
+}
+
+.answer-button.easy {
+  color: #1167bc;
+}
+
+.study-status-bar {
+  display: grid;
+  min-height: 38px;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 8px;
+}
+
+.study-counts {
+  grid-column: 2;
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.count-new {
+  color: var(--anki-new);
+}
+
+.count-learn {
+  color: var(--anki-learn);
+}
+
+.count-review {
+  color: var(--anki-review);
+}
+
+.study-status-bar .anki-icon-button {
+  grid-column: 3;
+  justify-self: end;
+}
+
+/* Browser */
+
+.list-screen,
+.grouped-screen {
+  background: var(--anki-grouped);
+}
+
+.browse-controls {
+  padding: 8px 8px 6px;
+  border-bottom: 0.5px solid var(--anki-line);
+  background: #efeff4;
+}
+
+.search-field {
+  display: flex;
+  height: 36px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border-radius: 9px;
+  background: #fff;
+  color: #8e8e93;
+}
+
+.search-field input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #222;
+  font-size: 15px;
+}
+
+.browse-toolbar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 6px;
+}
+
+.browse-toolbar button {
+  min-height: 30px;
+  border: 0;
+  border-right: 0.5px solid #c7c7cc;
+  background: transparent;
+  color: var(--anki-blue);
+  font-size: 14px;
+}
+
+.browse-toolbar button:last-child {
+  border-right: 0;
+}
+
+.browser-table {
+  background: #fff;
+}
+
+.browser-header,
+.browser-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  text-align: left;
+}
+
+.browser-header {
+  min-height: 28px;
+  align-items: center;
+  padding: 0 13px;
+  border-bottom: 0.5px solid var(--anki-line);
+  background: #f1f1f3;
+  color: #666;
   font-size: 12px;
+  font-weight: 600;
+}
+
+.browser-row {
+  width: 100%;
+  min-height: 47px;
+  align-items: center;
+  padding: 0 13px;
+  border: 0;
+  border-bottom: 0.5px solid #d5d5d8;
+  background: #fff;
+  color: #111;
+  font-size: 15px;
+}
+
+.browser-row span {
+  overflow: hidden;
+  padding-right: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Add / Edit */
+
+.editor-screen {
+  padding-bottom: calc(51px + env(safe-area-inset-bottom));
+  background: #f2f2f7;
+}
+
+.editor-options {
+  margin-bottom: 18px;
+  border-bottom: 0.5px solid #c7c7cc;
+  background: #fff;
+}
+
+.editor-options button,
+.settings-group button {
+  display: flex;
+  width: 100%;
+  min-height: 46px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px 0 16px;
+  border: 0;
+  border-bottom: 0.5px solid #d4d4d8;
+  background: #fff;
+  color: #111;
+  text-align: left;
+}
+
+.editor-options button:last-child,
+.settings-group button:last-child {
+  border-bottom: 0;
+}
+
+.editor-options button > span:first-child {
+  width: 45px;
+  flex: 0 0 auto;
+  color: #555;
+  font-size: 14px;
+}
+
+.editor-options button strong {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-options button > span:last-child,
+.disclosure {
+  margin-left: auto;
+  color: #c1c1c6;
+  font-size: 25px;
+  font-weight: 300;
+}
+
+.field-editor {
+  display: grid;
+  gap: 16px;
+  padding: 0 12px 80px;
+}
+
+.field-editor label {
+  display: block;
+  overflow: hidden;
+  border: 1px solid #c7c7cc;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.field-editor label > span {
+  display: block;
+  padding: 6px 9px 4px;
+  border-bottom: 0.5px solid #ddd;
+  color: #777;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.field-editor textarea,
+.field-editor input {
+  display: block;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: #fff;
+  color: #111;
+  font-size: 17px;
+}
+
+.field-editor textarea {
+  min-height: 112px;
+  resize: vertical;
+  padding: 10px;
+}
+
+.field-editor input {
+  min-height: 44px;
+  padding: 0 10px;
+}
+
+.format-toolbar {
+  position: fixed;
+  z-index: 25;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  width: min(100%, 680px);
+  min-height: calc(48px + env(safe-area-inset-bottom));
+  margin: 0 auto;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding: 0 6px env(safe-area-inset-bottom);
+  border-top: 0.5px solid #c7c7cc;
+  background: rgba(248, 248, 250, 0.98);
+}
+
+.format-toolbar button {
+  min-width: 43px;
+  min-height: 46px;
+  border: 0;
+  background: transparent;
+  color: #333;
+  font-size: 15px;
+}
+
+/* Grouped iOS-style lists */
+
+.grouped-content,
+.stats-content,
+.help-content {
+  padding: 16px 12px calc(28px + env(safe-area-inset-bottom));
+}
+
+.settings-section {
+  margin-bottom: 24px;
+}
+
+.settings-section h2 {
+  margin: 0 0 7px 16px;
+  color: #6d6d72;
+  font-size: 13px;
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
+.settings-group {
+  overflow: hidden;
+  border: 0.5px solid #d1d1d6;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.settings-group button {
+  min-height: 48px;
+  font-size: 16px;
+}
+
+.ios-switch {
+  position: relative;
+  width: 51px;
+  height: 31px;
+  margin-left: auto;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #e5e5ea;
+}
+
+.ios-switch::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  content: "";
+}
+
+.ios-switch.on {
+  background: #34c759;
+}
+
+.ios-switch.on::after {
+  left: 22px;
+}
+
+/* Stats */
+
+.stats-summary,
+.chart-card {
+  margin-bottom: 14px;
+  padding: 18px;
+  border: 0.5px solid #d1d1d6;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.stats-summary > p,
+.stats-summary > span {
+  margin: 0;
+  color: #6d6d72;
+  text-align: center;
+}
+
+.stats-summary > strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 44px;
+  font-weight: 300;
+  text-align: center;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 0.5px solid #ddd;
+}
+
+.stats-grid div {
+  display: grid;
+  gap: 3px;
+  text-align: center;
+}
+
+.stats-grid div + div {
+  border-left: 0.5px solid #ddd;
+}
+
+.stats-grid strong {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.stats-grid span {
+  color: #777;
+  font-size: 11px;
+}
+
+.chart-card h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+}
+
+.bar-chart {
+  display: flex;
+  height: 150px;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 6px 0;
+  border-bottom: 1px solid #b9b9be;
+}
+
+.bar-chart span {
+  flex: 1;
+  min-width: 10px;
+  border-radius: 2px 2px 0 0;
+  background: #5aa0e6;
+}
+
+.chart-labels {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  padding: 5px 6px 0;
+  color: #777;
+  font-size: 10px;
+  text-align: center;
+}
+
+.stats-links {
+  margin-bottom: 24px;
+}
+
+/* Tools */
+
+.frequent-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.frequent-actions button {
+  min-height: 55px;
+  border: 0.5px solid #c7c7cc;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--anki-blue);
+  font-size: 15px;
+}
+
+.text-size-tools button {
+  padding: 0 4px;
+  font-size: 14px;
+}
+
+/* Help */
+
+.help-content {
+  text-align: center;
+}
+
+.anki-mark {
+  display: grid;
+  width: 78px;
+  height: 78px;
+  margin: 24px auto 12px;
+  place-items: center;
+  border-radius: 18px;
+  background: #3c78b5;
+  color: #fff;
+  font-size: 42px;
   font-weight: 700;
 }
 
-.nav-item.active {
-  background: #e8f1fd;
-  color: #1f6fd1;
+.help-content h2 {
+  margin: 0;
+  font-size: 22px;
 }
 
-.nav-item:disabled {
-  opacity: 0.42;
+.help-content > p {
+  max-width: 460px;
+  margin: 9px auto 26px;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root,
-  html,
-  body {
-    background: #111316;
-    color: #f3f4f6;
+.help-content .settings-group {
+  text-align: left;
+}
+
+@media (max-width: 410px) {
+  .anki-nav-bar {
+    grid-template-columns: minmax(64px, 1fr) auto minmax(64px, 1fr);
   }
 
-  .panel,
-  .storage-banner,
-  .deck-list {
-    border-color: #2a2e34;
-    background: rgba(28, 31, 35, 0.94);
-    box-shadow: none;
+  .anki-nav-title {
+    max-width: 125px;
   }
 
-  .deck-row {
-    border-bottom-color: #2a2e34;
+  .deck-top-actions .anki-icon-button {
+    width: 28px;
   }
 
-  .deck-row:active {
-    background: #252a30;
+  .study-nav-actions button {
+    padding: 0 3px;
+    font-size: 13px;
   }
 
-  .bottom-nav {
-    border-top-color: #2a2e34;
-    background: rgba(20, 22, 25, 0.94);
+  .review-prompt {
+    font-size: 31px;
   }
 
-  .nav-item.active {
-    background: #18375d;
-    color: #8ec0ff;
+  .answer-grid {
+    gap: 3px;
   }
 }
