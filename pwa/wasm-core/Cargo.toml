@@ -1,0 +1,16 @@
+[package]
+name = "anki-pwa-wasm"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+anki = { path = "../../rslib", features = ["browser-wasm"] }
+console_error_panic_hook = "0.1.7"
+wasm-bindgen = "0.2.104"
