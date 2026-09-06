@@ -4,6 +4,7 @@ on:
   push:
     branches: [anki-mobile-ui]
     paths:
+      - "Cargo.toml"
       - "rslib/**"
       - "pwa/wasm-core/**"
       - ".github/workflows/pwa-wasm.yml"
@@ -18,6 +19,12 @@ jobs:
 
       - name: Add browser WASM target
         run: rustup target add wasm32-unknown-unknown
+
+      - name: Trace mio and Tokio networking
+        run: |
+          cargo tree --manifest-path pwa/wasm-core/Cargo.toml --target wasm32-unknown-unknown -e features -i mio || true
+          echo "--- tokio features ---"
+          cargo tree --manifest-path pwa/wasm-core/Cargo.toml --target wasm32-unknown-unknown -e features -i tokio || true
 
       - name: Check Anki browser bridge
         run: cargo check --manifest-path pwa/wasm-core/Cargo.toml --target wasm32-unknown-unknown
