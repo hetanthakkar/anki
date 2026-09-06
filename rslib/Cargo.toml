@@ -117,10 +117,10 @@ zip.workspace = true
 zstd.workspace = true
 
 [target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dependencies]
-rusqlite.workspace = true
+rusqlite = { workspace = true, features = ["bundled"] }
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
-rusqlite = { version = "0.40.2", default-features = false, features = ["trace", "functions", "collation", "ffi-sqlite-wasm-rs"] }
+rusqlite = { workspace = true, features = ["ffi-sqlite-wasm-rs"] }
 
 [target.'cfg(windows)'.dependencies]
 windows.workspace = true
