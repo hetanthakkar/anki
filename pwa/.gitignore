@@ -1,5 +1,7 @@
 node_modules/
 .next/
 out/
+public/wasm/anki-core/
+wasm-core/target/
 *.log
 .DS_Store
