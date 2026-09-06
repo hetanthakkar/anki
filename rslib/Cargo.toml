@@ -51,9 +51,6 @@ anki_io.workspace = true
 anki_proto.workspace = true
 async-compression.workspace = true
 async-trait.workspace = true
-axum.workspace = true
-axum-client-ip.workspace = true
-axum-extra.workspace = true
 bitflags.workspace = true
 blake3.workspace = true
 bytes.workspace = true
@@ -73,7 +70,6 @@ fsrs.workspace = true
 futures.workspace = true
 hex.workspace = true
 htmlescape.workspace = true
-hyper.workspace = true
 id_tree.workspace = true
 itertools.workspace = true
 nom.workspace = true
@@ -104,9 +100,7 @@ sha2.workspace = true
 snafu.workspace = true
 strum.workspace = true
 tempfile.workspace = true
-tokio.workspace = true
 tokio-util.workspace = true
-tower-http.workspace = true
 tracing.workspace = true
 tracing-appender.workspace = true
 tracing-subscriber.workspace = true
@@ -117,10 +111,17 @@ zip.workspace = true
 zstd.workspace = true
 
 [target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dependencies]
+axum.workspace = true
+axum-client-ip.workspace = true
+axum-extra.workspace = true
+hyper.workspace = true
 rusqlite = { workspace = true, features = ["bundled"] }
+tokio.workspace = true
+tower-http.workspace = true
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 rusqlite = { workspace = true, features = ["ffi-sqlite-wasm-rs"] }
+tokio = { version = "1.45", default-features = false, features = ["rt", "macros", "time", "sync", "io-util"] }
 
 [target.'cfg(windows)'.dependencies]
 windows.workspace = true
