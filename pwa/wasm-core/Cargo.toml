@@ -1,11 +1,11 @@
 [package]
 name = "anki-pwa-wasm"
-version.workspace = true
-authors.workspace = true
-edition.workspace = true
-license.workspace = true
+version = "0.1.0"
+authors = ["Ankitects Pty Ltd and contributors <https://help.ankiweb.net>"]
+edition = "2021"
+license = "AGPL-3.0-or-later"
 publish = false
-rust-version.workspace = true
+rust-version = "1.80"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -14,3 +14,5 @@ crate-type = ["cdylib", "rlib"]
 anki = { path = "../../rslib", features = ["browser-wasm"] }
 console_error_panic_hook = "0.1.7"
 wasm-bindgen = "0.2.104"
+
+[workspace]
