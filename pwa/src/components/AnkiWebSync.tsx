@@ -99,7 +99,7 @@ export function AnkiWebSync({ persistent, onBusyChange }: {
       </div>
 
       {!hostKey ? (
-        <form onSubmit={(event) => void login(event)}>
+        <form className="form-panel" onSubmit={(event) => void login(event)}>
           <label htmlFor="ankiweb-account">AnkiWeb email</label>
           <input id="ankiweb-account" type="email" autoComplete="username" value={account}
             onChange={(event) => setAccount(event.target.value)} placeholder="you@example.com" />
@@ -114,9 +114,9 @@ export function AnkiWebSync({ persistent, onBusyChange }: {
       ) : (
         <>
           <p className="muted">Connected as <strong>{account || "AnkiWeb account"}</strong>.</p>
-          <p className="muted">Sync is intentionally simple: choose one direction. It does not merge simultaneous changes from both sides.</p>
+          <p className="muted">Choose one direction. This full sync does not merge simultaneous changes from both sides.</p>
           {!persistent && <p className="form-error" role="alert">Downloading requires persistent browser storage. Uploading still works.</p>}
-          <div className="form-actions">
+          <div style={{ display: "grid", gap: 8 }}>
             <button className="primary-button" type="button" disabled={busy} onClick={() => void upload()}>
               Upload to AnkiWeb
             </button>
