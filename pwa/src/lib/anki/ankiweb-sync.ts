@@ -11,7 +11,9 @@ import {
 const AUTH_STORAGE_KEY = "anki-pwa-ankiweb-auth-v1";
 const MEDIA_STATE_PREFIX = "anki-pwa-ankiweb-media-v1:";
 const MEDIA_DIRECTORY = "anki-pwa-media-v2";
-const MEDIA_BATCH_SIZE = 25;
+const MEDIA_MAX_BATCH_FILES = 25;
+const MEDIA_TARGET_BATCH_BYTES = Math.floor(2.5 * 1024 * 1024);
+const MEDIA_MAX_FILE_BYTES = 100 * 1024 * 1024;
 const MEDIA_CLIENT_VERSION = "anki-pwa/0.1";
 
 type MediaFile = { name: string; bytes: Uint8Array };
@@ -79,7 +81,11 @@ function mediaResult<T>(bytes: Uint8Array): T {
 }
 
 function validMediaName(name: string) {
-  return Boolean(name) && name !== "." && name !== ".." && !/[\\/\u0000-\u001f\u007f]/.test(name);
+  return Boolean(name)
+    && name !== "."
+    && name !== ".."
+    && new TextEncoder().encode(name).byteLength <= 255
+    && !/[\\/\u0000-\u001f\u007f]/.test(name);
 }
 
 function safeMediaName(input: string) {
@@ -111,6 +117,7 @@ async function readLocalMedia() {
 async function writeLocalMedia(nameInput: string, bytes: Uint8Array) {
   const name = safeMediaName(nameInput);
   if (!bytes.length) throw new Error(`AnkiWeb returned empty media: ${name}`);
+  if (bytes.byteLength > MEDIA_MAX_FILE_BYTES) throw new Error(`AnkiWeb media is too large: ${name}`);
   const directory = await mediaDirectory();
   const handle = await directory.getFileHandle(name, { create: true });
   const writable = await handle.createWritable();
@@ -145,7 +152,7 @@ async function mediaHashes(files: Map<string, Uint8Array>) {
 }
 
 function mediaStateKey(auth: AnkiWebAuth) {
-  return `${MEDIA_STATE_PREFIX}${auth.username.trim().toLocaleLowerCase()}`;
+  return `${MEDIA_STATE_PREFIX}${auth.username.trim().toLowerCase()}`;
 }
 
 function loadMediaState(auth: AnkiWebAuth): MediaSyncState {
@@ -167,8 +174,9 @@ function saveMediaState(auth: AnkiWebAuth, state: MediaSyncState) {
   try {
     localStorage.setItem(mediaStateKey(auth), JSON.stringify(state));
   } catch {
-    // Media still synced successfully. A future sync will conservatively start
-    // from USN 0 again if browser storage cannot fit the checksum index.
+    // Do not leave a stale USN behind if the checksum index exceeds browser
+    // storage quota. Starting at USN 0 next time is slower but correct.
+    localStorage.removeItem(mediaStateKey(auth));
   }
 }
 
@@ -182,6 +190,9 @@ function mediaUploadZip(files: MediaUpload[]) {
   files.forEach((file, index) => {
     const name = safeMediaName(file.name);
     if (file.bytes) {
+      if (!file.bytes.length || file.bytes.byteLength > MEDIA_MAX_FILE_BYTES) {
+        throw new Error(`Media cannot be synced because its size is unsupported: ${name}`);
+      }
       const entry = String(index);
       archive[entry] = [file.bytes, { level: 0 }];
       meta.push([name, entry]);
@@ -203,6 +214,22 @@ function mediaDownloadFiles(zipBytes: Uint8Array) {
     if (!bytes) throw new Error("AnkiWeb returned an incomplete media archive");
     return { name: safeMediaName(rawName), bytes };
   });
+}
+
+function nextUploadBatch(names: string[], offset: number, local: Map<string, Uint8Array>) {
+  const batch: string[] = [];
+  let bytes = 0;
+  for (let index = offset; index < names.length && batch.length < MEDIA_MAX_BATCH_FILES; index += 1) {
+    if (batch.length && bytes > MEDIA_TARGET_BATCH_BYTES) break;
+    const name = names[index];
+    const data = local.get(name);
+    if (data && data.byteLength > MEDIA_MAX_FILE_BYTES) {
+      throw new Error(`Media cannot be synced because it exceeds 100 MiB: ${name}`);
+    }
+    batch.push(name);
+    bytes += data?.byteLength ?? 0;
+  }
+  return batch;
 }
 
 async function syncMedia(auth: AnkiWebAuth, session: string, progress: (message: string) => void) {
@@ -228,7 +255,7 @@ async function syncMedia(auth: AnkiWebAuth, session: string, progress: (message:
         await requestAnkiWeb("msync", "mediaChanges", jsonBytes({ lastUsn: cursor }), auth.hostKey, session)
       );
       if (!Array.isArray(changes) || !changes.length) {
-        cursor = serverUsn;
+        cursor = Math.max(cursor, serverUsn);
         break;
       }
 
@@ -266,8 +293,8 @@ async function syncMedia(auth: AnkiWebAuth, session: string, progress: (message:
         cursor = Math.max(cursor, usn);
       }
 
-      for (let offset = 0; offset < downloads.length; offset += MEDIA_BATCH_SIZE) {
-        const batch = downloads.slice(offset, offset + MEDIA_BATCH_SIZE);
+      for (let offset = 0; offset < downloads.length; offset += MEDIA_MAX_BATCH_FILES) {
+        const batch = downloads.slice(offset, offset + MEDIA_MAX_BATCH_FILES);
         const wanted = new Map(batch.map((file) => [file.name, file.sha1]));
         const downloaded = mediaDownloadFiles(
           await requestAnkiWeb("msync", "downloadFiles", jsonBytes({ files: batch.map((file) => file.name) }), auth.hostKey, session)
@@ -284,8 +311,6 @@ async function syncMedia(auth: AnkiWebAuth, session: string, progress: (message:
         }
         if (wanted.size) throw new Error("AnkiWeb did not return all requested media files");
       }
-
-      if (cursor >= serverUsn) break;
     }
   }
 
@@ -298,8 +323,10 @@ async function syncMedia(auth: AnkiWebAuth, session: string, progress: (message:
     .sort((left, right) => left.localeCompare(right));
 
   let finalUsn = Math.max(cursor, serverUsn);
-  for (let offset = 0; offset < pending.length; offset += MEDIA_BATCH_SIZE) {
-    const namesBatch = pending.slice(offset, offset + MEDIA_BATCH_SIZE);
+  let offset = 0;
+  while (offset < pending.length) {
+    const namesBatch = nextUploadBatch(pending, offset, local);
+    if (!namesBatch.length) throw new Error("Could not create an AnkiWeb media upload batch");
     progress(`Uploading media ${offset + 1}–${Math.min(offset + namesBatch.length, pending.length)} of ${pending.length}…`);
     const uploads: MediaUpload[] = namesBatch.map((name) => ({ name, bytes: local.get(name) }));
     const reply = mediaResult<[number, number]>(
@@ -316,6 +343,7 @@ async function syncMedia(auth: AnkiWebAuth, session: string, progress: (message:
       if (hash) state.hashes[name] = hash;
       else delete state.hashes[name];
     }
+    offset += namesBatch.length;
   }
 
   const sanity = mediaResult<string>(
