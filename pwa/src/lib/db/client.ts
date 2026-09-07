@@ -173,3 +173,38 @@ export function getNextCard(deckId: number) {
 export function answerCard(cardId: number, rating: ReviewRating, timeMs: number) {
   return request<void>({ type: "answerCard", cardId, rating, timeMs });
 }
+
+export function replaceLocalCollection(bytes: ArrayBuffer) {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("The local collection is only available in the browser"));
+  }
+
+  const replaced = new Error("The local collection was replaced by AnkiWeb sync");
+  for (const waiter of pending.values()) waiter.reject(replaced);
+  pending.clear();
+  worker?.terminate();
+  worker = null;
+
+  return new Promise<void>((resolve, reject) => {
+    const importer = new Worker(new URL("./anki-sync-import.worker.ts", import.meta.url), { type: "module" });
+    const timeout = window.setTimeout(() => {
+      importer.terminate();
+      reject(new Error("Timed out while replacing the local collection"));
+    }, 30_000);
+
+    const finish = (callback: () => void) => {
+      window.clearTimeout(timeout);
+      importer.terminate();
+      callback();
+    };
+
+    importer.addEventListener("message", (event: MessageEvent<{ ok: boolean; error?: string }>) => {
+      if (event.data.ok) finish(resolve);
+      else finish(() => reject(new Error(event.data.error ?? "Could not replace the local collection")));
+    }, { once: true });
+    importer.addEventListener("error", (event) => {
+      finish(() => reject(new Error(event.message || "Collection replacement worker failed")));
+    }, { once: true });
+    importer.postMessage(bytes, [bytes]);
+  });
+}

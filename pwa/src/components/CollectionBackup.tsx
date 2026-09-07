@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { exportCollection } from "@/lib/db/client";
 import type { CollectionBackupResult } from "@/lib/db/types";
+import { AnkiWebSync } from "./AnkiWebSync";
 
 function downloadBackup(result: CollectionBackupResult) {
   const url = URL.createObjectURL(new Blob([result.bytes], { type: "application/x-colpkg" }));
@@ -45,6 +46,7 @@ export function CollectionBackup({ persistent, onBusyChange }: {
 
   return (
     <section className="settings-list">
+      <AnkiWebSync persistent={persistent} onBusyChange={onBusyChange} />
       <div className="panel backup-panel" aria-busy={busy}>
         <div>
           <h2>Collection backup</h2>
