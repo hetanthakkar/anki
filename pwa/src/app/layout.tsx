@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { PwaRegister } from "@/components/PwaRegister";
 
 import "./globals.css";
+import "./reviewer.css";
 
 export const metadata: Metadata = {
   title: "Anki PWA",
