@@ -3,14 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-const CENTERING_STYLE = `<style id="reviewer-card-centering">
-html,body{min-height:100%;}
-body{min-height:100vh;box-sizing:border-box;display:flex!important;flex-direction:column;align-items:center;justify-content:center;}
-body>*{max-width:100%;}
-hr{width:100%;}
-img,video,audio{margin-left:auto!important;margin-right:auto!important;}
-</style>`;
-
 function parseCount(value: string | null) {
   const match = value?.match(/(\d+)\s+of\s+(\d+)/i);
   return match ? { current: Number(match[1]), total: Number(match[2]) } : null;
@@ -26,16 +18,6 @@ function sessionTarget(reviewer: HTMLElement) {
     return Math.max(1, newCards + reviewing.current + learning.current);
   }
   return 8;
-}
-
-function centerReviewerFrames() {
-  document.querySelectorAll<HTMLIFrameElement>(".reviewer .study-card-frame").forEach((frame) => {
-    const source = frame.srcdoc;
-    if (!source || source.includes("reviewer-card-centering")) return;
-    frame.srcdoc = source.includes("</head>")
-      ? source.replace("</head>", `${CENTERING_STYLE}</head>`)
-      : `${CENTERING_STYLE}${source}`;
-  });
 }
 
 export function ReviewerEnhancements() {
@@ -59,17 +41,13 @@ export function ReviewerEnhancements() {
         if (ratings.current === 0) target.current = sessionTarget(nextReviewer);
         if (nextReviewer.querySelector(".congratulations")) setProgress(1);
       }
-
-      centerReviewerFrames();
     };
 
     sync();
     const observer = new MutationObserver(sync);
     observer.observe(document.body, {
       childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["srcdoc"]
+      subtree: true
     });
 
     const handleRating = (event: MouseEvent) => {
