@@ -36,14 +36,18 @@ function errorMessage(error: unknown) {
 function cardDocument(content: string, cardCss: string) {
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
     <style>
-      :root{color-scheme:light dark}body{margin:0;padding:28px 22px;font-family:Arial,sans-serif;font-size:21px;
-      line-height:1.45;text-align:center;color:#17191c;background:#fff;overflow-wrap:anywhere}
-      hr#answer{margin:28px 0;border:0;border-top:1px solid #d8dce3}img,video{max-width:100%;height:auto}
+      :root{color-scheme:light}html,body{margin:0;width:100%;min-height:100%;background:#fff}
+      body.card{box-sizing:border-box;min-height:100vh;padding:28px 22px!important;display:flex!important;align-items:center!important;justify-content:center!important;
+      font-family:Arial,sans-serif;font-size:21px;line-height:1.45;text-align:center!important;color:#17191c!important;background:#fff!important;overflow-wrap:anywhere}
+      .anki-card-content{width:100%;max-width:100%;color:#17191c!important;text-align:center!important}
+      hr#answer{width:100%;margin:28px 0;border:0;border-top:1px solid #d8dce3}img,video{max-width:100%;height:auto}
       .anki-audio{width:min(100%,360px);margin:14px auto}.hint{color:#1f6fd1;text-decoration:underline;cursor:help}
       .type-answer-marker{display:inline-block;margin-top:16px;color:#667085;font-size:14px}.type-answer-correct{font-weight:700}
-      @media(prefers-color-scheme:dark){body{color:#f3f4f6;background:#1c1f23}hr#answer{border-color:#3b4149}}
       ${cardCss.replace(/<\/style/gi, "<\\/style")}
-    </style></head><body class="card">${content}</body></html>`;
+      body.card{color:#17191c!important;background:#fff!important;text-align:center!important}
+      .anki-card-content{color:#17191c!important;text-align:center!important}
+      .anki-card-content .cloze{color:#2badd5!important}
+    </style></head><body class="card"><div class="anki-card-content">${content}</div></body></html>`;
 }
 
 function occlusionNumber(value: number) {
