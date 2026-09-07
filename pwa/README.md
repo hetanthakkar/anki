@@ -1,6 +1,6 @@
 # Anki PWA
 
-A frontend-only Next.js PWA with an on-device Anki-format collection. No hosted database, backend, or paid service is needed for local study and imports.
+A Next.js PWA with an on-device Anki-format collection. No hosted application database or paid service is needed for local study and imports. Optional AnkiWeb sync uses a constrained same-origin Next.js route to reach Anki's sync service.
 
 ## Current milestone
 
@@ -19,9 +19,23 @@ A frontend-only Next.js PWA with an on-device Anki-format collection. No hosted 
 - FSRS scheduling and local review history
 - local `.apkg` import with legacy and modern (Zstd/protobuf) package support
 - AnkiWeb shared-deck search launcher and local `.apkg` import
+- AnkiWeb account login plus one-way full collection/media upload and download
 - downloadable `.colpkg` collection backups with scheduling history and media
 - per-deck scheduling options for daily limits, FSRS retention, maximum intervals, and learning steps
 - collection/deck statistics with review activity, retention, streaks, answer breakdown, and card states
+
+## AnkiWeb sync
+
+Open **Settings → AnkiWeb sync**, enter your AnkiWeb email and password, and select **Connect AnkiWeb**. The password is used only for the login request and is not stored; the returned AnkiWeb sync key is stored in this browser.
+
+Sync is deliberately one-way and explicit:
+
+- **Upload to AnkiWeb** replaces the AnkiWeb collection with this device's collection, uploads local media, and removes AnkiWeb media that is no longer present locally.
+- **Download from AnkiWeb** replaces this device's collection and media with the current AnkiWeb versions, then reloads the app.
+- There is no incremental conflict merge yet. If both sides changed, choose which side should win before syncing.
+- Download requires persistent OPFS storage. Upload also works from the temporary-storage fallback.
+
+The PWA uses Anki's legacy multipart sync protocol for full collection transfers because the local database already uses Anki schema 11. Media uses Anki's `msync` protocol in bounded batches. AnkiWeb requests are proxied only through the allowlisted `/api/ankiweb` route; the proxy has no stored AnkiWeb credentials.
 
 ## Configure a deck
 
@@ -45,7 +59,7 @@ To find a public deck, select **Shared**, enter a search, and choose **Search An
 
 Image Occlusion creation supports Anki-compatible rectangular masks, including “Hide all, guess one”. Imported rectangle, ellipse, and polygon masks are rendered during review. Anki's advanced polygon/text mask editor is not available yet.
 
-Collection backups can be imported into the official Anki desktop app. Restoring a `.colpkg` directly into this PWA is not supported yet. This is not full Anki feature parity: custom note-type/template management, shared deck-option preset management, add-ons, AnkiWeb sync, and script-dependent templates are not supported. Imported cards initially use the default PWA preset and can be customized per deck. Some advanced template filters and MathJax are not rendered. Keep an external backup of important collections.
+Collection backups can be imported into the official Anki desktop app. Restoring a `.colpkg` directly into this PWA is not supported yet. This is not full Anki feature parity: custom note-type/template management, shared deck-option preset management, add-ons, incremental two-way AnkiWeb merge sync, and script-dependent templates are not supported. Imported cards initially use the default PWA preset and can be customized per deck. Some advanced template filters and MathJax are not rendered. Keep an external backup of important collections.
 
 When the app reports **Temporary storage fallback**, imported data will not survive a reload. Browser/site-data clearing can also remove persistent OPFS data.
 
@@ -74,22 +88,19 @@ npm --prefix pwa start
 
 The SQLite worker needs the COOP/COEP response headers configured in `next.config.mjs`. They are required for the cross-origin-isolated browser environment used by SQLite's OPFS implementation.
 
+AnkiWeb sync requires the Next.js server route at `/api/ankiweb`; a purely static export can still use local study/import features but cannot perform AnkiWeb account sync.
+
 ## Architecture
 
 ```text
 Next.js UI
    |
-   v
-Typed worker RPC
+   +--> Typed worker RPC --> SQLite WASM worker --> OPFS collection/media
    |
-   v
-SQLite WASM worker
-   |
-   v
-OPFS .anki-pwa-v2 (collection) + anki-pwa-media-v2 (media)
+   +--> /api/ankiweb --> sync.ankiweb.net
 ```
 
-The browser worker owns the database. React components do not run SQLite queries directly.
+The browser worker owns the database. React components do not run SQLite queries directly. The AnkiWeb proxy is limited to login, full collection upload/download, and the media methods needed by this implementation.
 
 Import tests use the repository's original `.apkg` fixtures plus generated schema-18 packages. They cover scheduling, duplicate handling, ID/media collisions, corrupted archives, failed media writes and database rollback.
 
@@ -99,5 +110,5 @@ The browse smoke test covers note/tag editing, card status changes, card moves, 
 
 ## Next milestones
 
-1. More complete template rendering.
-2. Further investigation of AnkiWeb interoperability. Shared-deck discovery links to AnkiWeb; account sync is not supported.
+1. Incremental two-way AnkiWeb sync with conflict handling.
+2. More complete template rendering.
