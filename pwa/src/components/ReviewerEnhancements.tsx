@@ -89,9 +89,7 @@ export function ReviewerEnhancements() {
     observer.observe(document.body, {
       childList: true,
       subtree: true,
-      characterData: true,
-      attributes: true,
-      attributeFilter: ["srcdoc"]
+      characterData: true
     });
 
     const handleRating = (event: MouseEvent) => {
@@ -103,14 +101,18 @@ export function ReviewerEnhancements() {
 
       explored.current += 1;
 
-      // Give immediate feedback while the scheduler/database is updating. The
-      // MutationObserver replaces this estimate with the real due-card counts.
+      // Immediate estimate while Anki updates the actual due counts. Once the
+      // deck state renders, updateProgress() replaces this with real counts.
       if (rating === 2) remaining.current = Math.max(0, remaining.current - 0.5);
       if (rating === 3) remaining.current = Math.max(0, remaining.current - 1);
       if (rating === 4) remaining.current = Math.max(0, remaining.current - 1.25);
 
       const denominator = explored.current + remaining.current;
       setProgress(denominator > 0 ? Math.min(0.98, explored.current / denominator) : 0);
+
+      // React reuses the iframe elements for the next card, so retry after the
+      // async scheduler has had a chance to replace their srcDoc.
+      for (const delay of [50, 150, 350, 750]) window.setTimeout(centerReviewerFrames, delay);
     };
 
     document.addEventListener("click", handleRating, true);
