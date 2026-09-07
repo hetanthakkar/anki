@@ -802,7 +802,7 @@ h1 {
 }
 
 .primary-button:disabled,
-.answer-button:disabled {
+.answer-btn:disabled {
   cursor: default;
   opacity: 0.55;
 }
@@ -862,26 +862,230 @@ h1 {
   font-size: 13px;
 }
 
+/* ── Reviewer ── */
+
 .reviewer {
   display: grid;
-  min-height: calc(100dvh - 125px - env(safe-area-inset-top));
-  grid-template-rows: minmax(320px, 1fr) auto auto;
+  gap: 16px;
+}
+
+/* Study card panel */
+.study-card {
+  overflow: hidden;
+  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid #e2e5ea;
+  box-shadow:
+    0 1px 3px rgba(17, 24, 39, 0.04),
+    0 8px 32px rgba(17, 24, 39, 0.07);
+  perspective: 1200px;
+}
+
+.study-card-flipper {
+  position: relative;
+  width: 100%;
+  min-height: 320px;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.study-card-flipper--flipped {
+  transform: rotateY(180deg);
+}
+
+.study-card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.study-card-front {
+  z-index: 2;
+}
+
+.study-card-back {
+  transform: rotateY(180deg);
+}
+
+.study-card-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  border: 0;
+  background: #ffffff;
+}
+
+.study-card-prompt {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 18px 20px;
+  border: 0;
+  border-top: 1px solid #eceef2;
+  background: #f8f9fb;
+  color: #667085;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.study-card-prompt:hover {
+  background: #eef1f6;
+  color: #344054;
+}
+
+.prompt-arrow {
+  display: inline-block;
+  transition: transform 0.2s;
+}
+
+.study-card-prompt:hover .prompt-arrow {
+  transform: translateX(3px);
+}
+
+/* Answer buttons */
+.answer-buttons {
+  display: grid;
+  gap: 10px;
+}
+
+.answer-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 54px;
+  padding: 14px 20px;
+  border: 0;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s, filter 0.15s;
+}
+
+.answer-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.answer-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.answer-btn-label {
+  flex: 1;
+  text-align: center;
+}
+
+.answer-btn-interval {
+  opacity: 0.7;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Again – red */
+.answer-btn--1 {
+  background: #fef3f2;
+  color: #b42318;
+  border: 1.5px solid #fecdca;
+}
+.answer-btn--1:hover:not(:disabled) {
+  background: #fee4e2;
+}
+
+/* Hard – amber */
+.answer-btn--2 {
+  background: #fffaeb;
+  color: #b54708;
+  border: 1.5px solid #fedf89;
+}
+.answer-btn--2:hover:not(:disabled) {
+  background: #fef0c7;
+}
+
+/* Good – green */
+.answer-btn--3 {
+  background: #ecfdf3;
+  color: #067647;
+  border: 1.5px solid #a6f4c5;
+}
+.answer-btn--3:hover:not(:disabled) {
+  background: #d1fadf;
+}
+
+/* Easy – blue */
+.answer-btn--4 {
+  background: #eff8ff;
+  color: #175cd3;
+  border: 1.5px solid #b2ddff;
+}
+.answer-btn--4:hover:not(:disabled) {
+  background: #d1e9ff;
+}
+
+/* Review progress stats */
+.review-stats-panel {
+  display: grid;
   gap: 14px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e5ea;
+  box-shadow: 0 1px 3px rgba(17, 24, 39, 0.04);
 }
 
-.card-frame {
-  width: 100%;
-  min-height: 360px;
-  border: 1px solid #e7e9ee;
-  border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 8px 30px rgba(17, 24, 39, 0.05);
+.review-stat {
+  display: grid;
+  gap: 6px;
 }
 
-.show-answer {
-  width: 100%;
+.review-stat-label {
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
 }
 
+.review-stat-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: #eceef2;
+  overflow: hidden;
+}
+
+.review-stat-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
+.review-stat-fill--mastered {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+}
+
+.review-stat-fill--reviewing {
+  background: linear-gradient(90deg, #60a5fa, #2563eb);
+}
+
+.review-stat-fill--learning {
+  background: linear-gradient(90deg, #fbbf24, #d97706);
+}
+
+.review-stat-count {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Typed answer input */
 .typed-answer-panel {
   display: grid;
   gap: 7px;
@@ -932,36 +1136,19 @@ h1 {
 .typed-answer-result.correct strong:first-of-type { color: #067647; }
 .typed-answer-result.incorrect strong:first-of-type { color: #b42318; }
 
-.answer-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-}
-
-.answer-button {
-  display: grid;
-  min-height: 58px;
-  gap: 3px;
-  align-content: center;
-  border: 1px solid #d5d9e1;
-  border-radius: 12px;
+/* Generic card-frame (used outside reviewer too) */
+.card-frame {
+  width: 100%;
+  min-height: 360px;
+  border: 1px solid #e7e9ee;
+  border-radius: 18px;
   background: #fff;
-  color: #344054;
-  font-size: 13px;
-  font-weight: 750;
-  cursor: pointer;
+  box-shadow: 0 8px 30px rgba(17, 24, 39, 0.05);
 }
 
-.answer-button span {
-  color: #98a2b3;
-  font-size: 11px;
-  font-weight: 650;
+.show-answer {
+  width: 100%;
 }
-
-.rating-1 { border-color: #f1b4b4; color: #b42318; }
-.rating-2 { border-color: #efcf9b; color: #b54708; }
-.rating-3 { border-color: #9bc5f3; color: #175cd3; }
-.rating-4 { border-color: #9ed3ae; color: #067647; }
 
 .congratulations {
   align-self: start;
@@ -1085,8 +1272,7 @@ h1 {
   .shared-search input,
   .shared-search select,
   .browser-search input,
-  .browser-search select,
-  .answer-button {
+  .browser-search select {
     border-color: #3b4149;
     background: #17191c;
     color: #f3f4f6;
@@ -1158,6 +1344,81 @@ h1 {
     box-shadow: none;
   }
 
+  .study-card {
+    background: #1c1f23;
+    border-color: #2a2e34;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+
+  .study-card-frame {
+    background: #1c1f23;
+  }
+
+  .study-card-prompt {
+    border-top-color: #2a2e34;
+    background: #17191c;
+    color: #98a2b3;
+  }
+
+  .study-card-prompt:hover {
+    background: #252a30;
+    color: #d0d5dd;
+  }
+
+  .answer-btn--1 {
+    background: rgba(180, 35, 24, 0.15);
+    border-color: rgba(180, 35, 24, 0.3);
+    color: #fca5a5;
+  }
+  .answer-btn--1:hover:not(:disabled) {
+    background: rgba(180, 35, 24, 0.25);
+  }
+
+  .answer-btn--2 {
+    background: rgba(181, 71, 8, 0.15);
+    border-color: rgba(181, 71, 8, 0.3);
+    color: #fcd34d;
+  }
+  .answer-btn--2:hover:not(:disabled) {
+    background: rgba(181, 71, 8, 0.25);
+  }
+
+  .answer-btn--3 {
+    background: rgba(6, 118, 71, 0.15);
+    border-color: rgba(6, 118, 71, 0.3);
+    color: #86efac;
+  }
+  .answer-btn--3:hover:not(:disabled) {
+    background: rgba(6, 118, 71, 0.25);
+  }
+
+  .answer-btn--4 {
+    background: rgba(23, 92, 211, 0.15);
+    border-color: rgba(23, 92, 211, 0.3);
+    color: #93c5fd;
+  }
+  .answer-btn--4:hover:not(:disabled) {
+    background: rgba(23, 92, 211, 0.25);
+  }
+
+  .review-stats-panel {
+    background: #1c1f23;
+    border-color: #2a2e34;
+    box-shadow: none;
+  }
+
+  .review-stat-label {
+    color: #b3b9c3;
+  }
+
+  .review-stat-bar {
+    background: #2a2e34;
+  }
+
+  .review-stat-count {
+    color: #667085;
+  }
+
   .complete-mark {
     background: #163d2c;
     color: #75e0a7;
@@ -1185,14 +1446,10 @@ h1 {
     margin-left: 17px;
   }
 
-  .answer-grid {
-    gap: 5px;
-  }
-
-  .answer-button {
-    min-width: 0;
-    padding: 8px 3px;
-    font-size: 12px;
+  .answer-btn {
+    min-height: 48px;
+    padding: 12px 16px;
+    font-size: 15px;
   }
 
   .shared-search-row {

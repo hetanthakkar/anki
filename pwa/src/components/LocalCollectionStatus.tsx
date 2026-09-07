@@ -500,32 +500,70 @@ export function LocalCollectionStatus() {
             </div>
           ) : studyCard ? (
             <>
-              <iframe className="card-frame" sandbox="" title={answerShown ? "Card answer" : "Card question"} srcDoc={cardDocument(answerShown ? studyCard.answerHtml : studyCard.questionHtml, studyCard.cardCss)} />
-              {actionError && <p className="form-error" role="alert">{actionError}</p>}
-              {!answerShown ? (
+              <div className="study-card">
+                <div className={`study-card-flipper${answerShown ? " study-card-flipper--flipped" : ""}`}>
+                  <div className="study-card-face study-card-front">
+                    <iframe className="study-card-frame" sandbox="" title="Card question" srcDoc={cardDocument(studyCard.questionHtml, studyCard.cardCss)} />
+                  </div>
+                  <div className="study-card-face study-card-back">
+                    <iframe className="study-card-frame" sandbox="" title="Card answer" srcDoc={cardDocument(studyCard.answerHtml, studyCard.cardCss)} />
+                  </div>
+                </div>
+                {!answerShown && !studyCard.typedAnswer && (
+                  <button className="study-card-prompt" type="button" onClick={() => setAnswerShown(true)}>
+                    Click to see back <span className="prompt-arrow">→</span>
+                  </button>
+                )}
+              </div>
+              {!answerShown && studyCard.typedAnswer && (
                 <>
-                  {studyCard.typedAnswer && <label className="typed-answer-panel" htmlFor="typed-answer">
+                  <label className="typed-answer-panel" htmlFor="typed-answer">
                     <span>Type your answer</span>
                     <input id="typed-answer" autoFocus autoComplete="off" value={typedAnswer}
                       onChange={(event) => setTypedAnswer(event.target.value)}
                       onKeyDown={(event) => { if (event.key === "Enter") setAnswerShown(true); }} />
-                  </label>}
+                  </label>
                   <button className="primary-button show-answer" type="button" onClick={() => setAnswerShown(true)}>Show answer</button>
                 </>
-              ) : (
-                <>
-                  {studyCard.typedAnswer && <div className={`typed-answer-result ${typedAnswer.normalize("NFC").trim() === studyCard.typedAnswer.correct.normalize("NFC").trim() ? "correct" : "incorrect"}`}>
-                    <span>Your answer</span><strong>{typedAnswer || "(blank)"}</strong>
-                    <span>Correct answer</span><strong>{studyCard.typedAnswer.correct}</strong>
-                  </div>}
-                  <div className="answer-grid">
-                    {studyCard.answerOptions.map((option) => (
-                      <button className={`answer-button rating-${option.rating}`} type="button" key={option.rating} disabled={busy} onClick={() => void rateCard(option.rating)}>
-                        <span>{option.intervalLabel}</span>{["", "Again", "Hard", "Good", "Easy"][option.rating]}
+              )}
+              {answerShown && studyCard.typedAnswer && (
+                <div className={`typed-answer-result ${typedAnswer.normalize("NFC").trim() === studyCard.typedAnswer.correct.normalize("NFC").trim() ? "correct" : "incorrect"}`}>
+                  <span>Your answer</span><strong>{typedAnswer || "(blank)"}</strong>
+                  <span>Correct answer</span><strong>{studyCard.typedAnswer.correct}</strong>
+                </div>
+              )}
+              {actionError && <p className="form-error" role="alert">{actionError}</p>}
+              {answerShown && (
+                <div className="answer-buttons">
+                  {studyCard.answerOptions.map((option) => {
+                    const labels = ["", "Again", "Hard", "Good", "Easy"];
+                    return (
+                      <button className={`answer-btn answer-btn--${option.rating}`} type="button" key={option.rating} disabled={busy} onClick={() => void rateCard(option.rating)}>
+                        <span className="answer-btn-label">{labels[option.rating]}</span>
+                        <span className="answer-btn-interval">{option.intervalLabel}</span>
                       </button>
-                    ))}
+                    );
+                  })}
+                </div>
+              )}
+              {selectedDeck && (
+                <div className="review-stats-panel">
+                  <div className="review-stat">
+                    <span className="review-stat-label">Mastered</span>
+                    <div className="review-stat-bar"><div className="review-stat-fill review-stat-fill--mastered" style={{ width: selectedDeck.totalCards ? `${((selectedDeck.totalCards - selectedDeck.newCount) / selectedDeck.totalCards) * 100}%` : "0%" }} /></div>
+                    <span className="review-stat-count">{selectedDeck.totalCards - selectedDeck.newCount} of {selectedDeck.totalCards}</span>
                   </div>
-                </>
+                  <div className="review-stat">
+                    <span className="review-stat-label">Reviewing</span>
+                    <div className="review-stat-bar"><div className="review-stat-fill review-stat-fill--reviewing" style={{ width: selectedDeck.totalCards ? `${(selectedDeck.reviewCount / selectedDeck.totalCards) * 100}%` : "0%" }} /></div>
+                    <span className="review-stat-count">{selectedDeck.reviewCount} of {selectedDeck.totalCards}</span>
+                  </div>
+                  <div className="review-stat">
+                    <span className="review-stat-label">Learning</span>
+                    <div className="review-stat-bar"><div className="review-stat-fill review-stat-fill--learning" style={{ width: selectedDeck.totalCards ? `${(selectedDeck.learningCount / selectedDeck.totalCards) * 100}%` : "0%" }} /></div>
+                    <span className="review-stat-count">{selectedDeck.learningCount} of {selectedDeck.totalCards}</span>
+                  </div>
+                </div>
               )}
             </>
           ) : null}
