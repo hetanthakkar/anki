@@ -4,24 +4,28 @@ import { useEffect, useState } from "react";
 
 import {
   clearAnkiWebAuth,
+  downloadFromAnkiWeb,
   loadAnkiWebAuth,
   loginAnkiWeb,
   uploadToAnkiWeb
 } from "@/lib/anki/ankiweb-sync";
-import type { AnkiWebAuth, AnkiWebUploadResult } from "@/lib/anki/ankiweb-sync";
+import type { AnkiWebAuth, AnkiWebSyncResult } from "@/lib/anki/ankiweb-sync";
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "AnkiWeb sync failed.";
 }
 
-export function AnkiWebSync({ onBusyChange }: { onBusyChange: (busy: boolean) => void }) {
+export function AnkiWebSync({ persistent, onBusyChange }: {
+  persistent: boolean;
+  onBusyChange: (busy: boolean) => void;
+}) {
   const [auth, setAuth] = useState<AnkiWebAuth | null>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<AnkiWebUploadResult | null>(null);
+  const [result, setResult] = useState<AnkiWebSyncResult | null>(null);
 
   useEffect(() => {
     setAuth(loadAnkiWebAuth());
@@ -51,19 +55,31 @@ export function AnkiWebSync({ onBusyChange }: { onBusyChange: (busy: boolean) =>
       const signedIn = await loginAnkiWeb(username, password);
       setAuth(signedIn);
       setPassword("");
-      setProgress("");
     });
   };
 
-  const sync = () => {
-    if (!auth || busy) return;
+  const upload = () => {
+    if (!auth || busy || !persistent) return;
     if (!window.confirm(
-      "Upload this device's full collection to AnkiWeb? This replaces the collection currently stored on AnkiWeb. Media from this device will also be uploaded."
+      "Upload this device's full collection to AnkiWeb? This replaces the card collection currently stored on AnkiWeb. Media is merged separately."
     )) return;
 
     void run(async () => {
-      const uploaded = await uploadToAnkiWeb(auth, setProgress);
-      setResult(uploaded);
+      setResult(await uploadToAnkiWeb(auth, setProgress));
+    });
+  };
+
+  const download = () => {
+    if (!auth || busy || !persistent) return;
+    if (!window.confirm(
+      "Download the full collection from AnkiWeb? This replaces the card collection on this device. Local/remote media is merged separately."
+    )) return;
+
+    void run(async () => {
+      await downloadFromAnkiWeb(auth, setProgress);
+      // The main collection worker was intentionally stopped while replacing
+      // its OPFS database. Reload so every screen reopens the downloaded copy.
+      window.location.reload();
     });
   };
 
@@ -82,8 +98,12 @@ export function AnkiWebSync({ onBusyChange }: { onBusyChange: (busy: boolean) =>
       <div className="panel backup-panel" aria-busy={busy}>
         <div>
           <h2>AnkiWeb</h2>
-          <p className="muted">Upload this local collection and its media to your AnkiWeb account.</p>
+          <p className="muted">Sign in and move your full collection between this PWA and AnkiWeb. Media is merged in both directions.</p>
         </div>
+
+        {!persistent && (
+          <p className="form-error" role="alert">AnkiWeb collection sync requires persistent browser storage. Reload in a browser where OPFS is available.</p>
+        )}
 
         {!auth ? (
           <form className="form-panel" onSubmit={signIn}>
@@ -93,7 +113,7 @@ export function AnkiWebSync({ onBusyChange }: { onBusyChange: (busy: boolean) =>
             <label htmlFor="ankiweb-password">Password</label>
             <input id="ankiweb-password" type="password" autoComplete="current-password" value={password}
               onChange={(event) => setPassword(event.target.value)} disabled={busy} />
-            <p className="muted backup-help">Your password is sent only to AnkiWeb during sign-in and is not saved. The returned sync key is stored on this device.</p>
+            <p className="muted backup-help">Your password is sent only during sign-in and is not saved. The sync key returned by AnkiWeb is stored on this device.</p>
             {error && <p className="form-error" role="alert">{error}</p>}
             {busy && <p role="status" aria-live="polite">{progress}</p>}
             <button className="primary-button" type="submit" disabled={busy || !username.trim() || !password}>
@@ -103,16 +123,17 @@ export function AnkiWebSync({ onBusyChange }: { onBusyChange: (busy: boolean) =>
         ) : (
           <>
             <p className="muted">Signed in as <strong>{auth.username}</strong>.</p>
-            <p className="form-error">Collection sync is intentionally one-way in this first version: uploading replaces your AnkiWeb collection. It does not download or merge AnkiWeb card changes back into this PWA.</p>
+            <p className="muted backup-help">Collection sync is a full one-way replacement per action, matching Anki's full-sync flow. Choose <strong>Upload</strong> when this device should win, or <strong>Download</strong> when AnkiWeb should win. Media changes are merged separately.</p>
             {error && <p className="form-error" role="alert">{error}</p>}
             {busy && <p role="status" aria-live="polite">{progress}</p>}
             {result && <p className="backup-result" role="status" aria-live="polite">
-              Synced to AnkiWeb · {result.notes} notes · {result.cards} cards · {result.reviews} reviews · {result.media} media files
+              Synced · {result.notes} notes · {result.cards} cards · {result.reviews} reviews · {result.media} media files
             </p>}
             <div className="top-actions">
-              <button className="primary-button" type="button" disabled={busy} onClick={sync}>
+              <button className="primary-button" type="button" disabled={busy || !persistent} onClick={upload}>
                 {busy ? "Syncing…" : "Upload to AnkiWeb"}
               </button>
+              <button className="secondary-button" type="button" disabled={busy || !persistent} onClick={download}>Download from AnkiWeb</button>
               <button className="secondary-button" type="button" disabled={busy} onClick={signOut}>Sign out</button>
             </div>
           </>
