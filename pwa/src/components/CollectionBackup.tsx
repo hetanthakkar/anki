@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { exportCollection } from "@/lib/db/client";
 import type { CollectionBackupResult } from "@/lib/db/types";
+import { AnkiWebSync } from "./AnkiWebSync";
 
 function downloadBackup(result: CollectionBackupResult) {
   const url = URL.createObjectURL(new Blob([result.bytes], { type: "application/x-colpkg" }));
@@ -44,23 +45,26 @@ export function CollectionBackup({ persistent, onBusyChange }: {
   };
 
   return (
-    <section className="settings-list">
-      <div className="panel backup-panel" aria-busy={busy}>
-        <div>
-          <h2>Collection backup</h2>
-          <p className="muted">Download your decks, cards, scheduling history, note types, and media as an Anki collection package.</p>
+    <>
+      <AnkiWebSync onBusyChange={onBusyChange} />
+      <section className="settings-list">
+        <div className="panel backup-panel" aria-busy={busy}>
+          <div>
+            <h2>Collection backup</h2>
+            <p className="muted">Download your decks, cards, scheduling history, note types, and media as an Anki collection package.</p>
+          </div>
+          {!persistent && <p className="form-error" role="alert">This collection is using temporary storage. Download a backup before closing or reloading the app.</p>}
+          <p className="muted backup-help">The downloaded .colpkg can be imported into the official Anki desktop app. Importing a .colpkg back into this PWA is not supported yet.</p>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          {busy && <p role="status" aria-live="polite">{progress}</p>}
+          {result && <p className="backup-result" role="status" aria-live="polite">
+            Backup downloaded · {result.notes} notes · {result.cards} cards · {result.reviews} reviews · {result.media} media files
+          </p>}
+          <button className="primary-button" type="button" disabled={busy} onClick={() => void createBackup()}>
+            {busy ? "Creating backup…" : "Download backup"}
+          </button>
         </div>
-        {!persistent && <p className="form-error" role="alert">This collection is using temporary storage. Download a backup before closing or reloading the app.</p>}
-        <p className="muted backup-help">The downloaded .colpkg can be imported into the official Anki desktop app. Importing a .colpkg back into this PWA is not supported yet.</p>
-        {error && <p className="form-error" role="alert">{error}</p>}
-        {busy && <p role="status" aria-live="polite">{progress}</p>}
-        {result && <p className="backup-result" role="status" aria-live="polite">
-          Backup downloaded · {result.notes} notes · {result.cards} cards · {result.reviews} reviews · {result.media} media files
-        </p>}
-        <button className="primary-button" type="button" disabled={busy} onClick={() => void createBackup()}>
-          {busy ? "Creating backup…" : "Download backup"}
-        </button>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
