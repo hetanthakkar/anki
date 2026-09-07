@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
 import { PwaRegister } from "@/components/PwaRegister";
+import { ReviewerEnhancements } from "@/components/ReviewerEnhancements";
 
 import "./globals.css";
 import "./reviewer.css";
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="en">
       <body>
         <PwaRegister />
+        <ReviewerEnhancements />
         {children}
       </body>
     </html>
