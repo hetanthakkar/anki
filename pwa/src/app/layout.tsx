@@ -6,7 +6,6 @@ import { ReviewerEnhancements } from "@/components/ReviewerEnhancements";
 
 import "./globals.css";
 import "./reviewer.css";
-import "./reviewer-render-fix.css";
 
 export const metadata: Metadata = {
   title: "Anki PWA",
