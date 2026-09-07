@@ -201,6 +201,14 @@ pwa-test-card-types cdp_port="9231" url="http://127.0.0.1:3002/":
 pwa-test-backup cdp_port="9233" url="http://127.0.0.1:3002/":
     npm --prefix pwa run test:backup-browser -- {{cdp_port}} {{url}}
 
+# Same requirements as pwa-test-browser; reviews a card and verifies local statistics
+pwa-test-stats cdp_port="9235" url="http://127.0.0.1:3015/":
+    npm --prefix pwa run test:stats-browser -- {{cdp_port}} {{url}}
+
+# Same requirements as pwa-test-browser; verifies deck option persistence and scheduling limits
+pwa-test-deck-options cdp_port="9236" url="http://127.0.0.1:3016/":
+    npm --prefix pwa run test:deck-options-browser -- {{cdp_port}} {{url}}
+
 # Helpers to get the right commands for the platform
 
 ninja := if os() == "windows" { "tools\\ninja" } else { "./ninja" }

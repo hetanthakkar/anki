@@ -3,7 +3,7 @@
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
 import type { Database, Sqlite3Static } from "@sqlite.org/sqlite-wasm";
 import { Rating, State, default_w, fsrs } from "ts-fsrs";
-import type { CardInput, Grade, RecordLogItem } from "ts-fsrs";
+import type { CardInput, Grade, RecordLogItem, StepUnit } from "ts-fsrs";
 
 import { clozeOrdinals, renderAnkiCard } from "../anki/template";
 import type { AnkiNotetype } from "../anki/template";
@@ -18,9 +18,12 @@ import type {
   BrowserNote,
   CardState,
   CollectionBackupResult,
+  CollectionStats,
   DbRequest,
   DbResponse,
   DeckSummary,
+  DeckOptions,
+  DeckOptionsInput,
   LocalCollectionInfo,
   NoteTypeSummary,
   ReviewRating,
@@ -40,14 +43,6 @@ const LEARNING_STEPS = ["1m", "10m"] as const;
 const RELEARNING_STEPS = ["10m"] as const;
 const REQUEST_RETENTION = 0.9;
 
-const scheduler = fsrs({
-  request_retention: REQUEST_RETENTION,
-  maximum_interval: 36_500,
-  enable_fuzz: true,
-  enable_short_term: true,
-  learning_steps: LEARNING_STEPS,
-  relearning_steps: RELEARNING_STEPS
-});
 
 type AnkiDeck = {
   id: number;
@@ -466,6 +461,213 @@ function readDecks(database = collection()): Record<string, AnkiDeck> {
   return JSON.parse(json) as Record<string, AnkiDeck>;
 }
 
+type DeckConfigRecord = Record<string, unknown>;
+
+function readDeckConfigs(database = collection()): Record<string, DeckConfigRecord> {
+  const json = String(database.selectValue("SELECT dconf FROM col WHERE id = 1") ?? "{}");
+  return JSON.parse(json) as Record<string, DeckConfigRecord>;
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function boundedNumber(value: unknown, fallback: number, minimum: number, maximum: number) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.min(maximum, Math.max(minimum, number)) : fallback;
+}
+
+function configuredSteps(value: unknown, fallback: number[]) {
+  if (!Array.isArray(value)) return fallback;
+  const steps = value.map(Number);
+  return steps.every((step) => Number.isFinite(step) && step > 0 && step <= 43_200) ? steps : fallback;
+}
+
+function deckConfigFor(database: Database, deck: AnkiDeck) {
+  const configs = readDeckConfigs(database);
+  return configs[String(deck.conf)] ?? configs[String(DEFAULT_DECK_ID)]
+    ?? defaultDeckConfig(nowSeconds())[DEFAULT_DECK_ID];
+}
+
+function deckOptionsFor(database: Database, deck: AnkiDeck): DeckOptions {
+  const config = deckConfigFor(database, deck);
+  const newOptions = recordValue(config.new);
+  const reviewOptions = recordValue(config.rev);
+  const lapseOptions = recordValue(config.lapse);
+  const desiredRetention = boundedNumber(config.desiredRetention, REQUEST_RETENTION, 0.7, 0.99);
+  return {
+    deckId: deck.id,
+    deckName: deck.name,
+    presetName: String(config.name || "Default"),
+    usingDefaultPreset: Number(deck.conf) === DEFAULT_DECK_ID,
+    newCardsPerDay: Math.round(boundedNumber(newOptions.perDay, 20, 0, 9_999)),
+    maximumReviewsPerDay: Math.round(boundedNumber(reviewOptions.perDay, 200, 0, 9_999)),
+    desiredRetentionPercent: Math.round(desiredRetention * 1_000) / 10,
+    maximumIntervalDays: Math.round(boundedNumber(reviewOptions.maxIvl, 36_500, 1, 36_500)),
+    learningStepsMinutes: configuredSteps(newOptions.delays, [1, 10]),
+    relearningStepsMinutes: configuredSteps(lapseOptions.delays, [10])
+  };
+}
+
+function validatedDeckOptions(input: DeckOptionsInput): DeckOptionsInput {
+  const integer = (value: unknown, label: string, minimum: number, maximum: number) => {
+    const number = Number(value);
+    if (!Number.isInteger(number) || number < minimum || number > maximum) {
+      throw new Error(`${label} must be a whole number from ${minimum} to ${maximum}`);
+    }
+    return number;
+  };
+  const steps = (value: unknown, label: string) => {
+    if (!Array.isArray(value) || value.length > 10) throw new Error(`${label} must contain at most 10 steps`);
+    return value.map((step) => integer(step, label, 1, 43_200));
+  };
+  const desiredRetentionPercent = Number(input.desiredRetentionPercent);
+  if (!Number.isFinite(desiredRetentionPercent) || desiredRetentionPercent < 70 || desiredRetentionPercent > 99) {
+    throw new Error("Desired retention must be from 70% to 99%");
+  }
+  return {
+    newCardsPerDay: integer(input.newCardsPerDay, "New cards per day", 0, 9_999),
+    maximumReviewsPerDay: integer(input.maximumReviewsPerDay, "Maximum reviews per day", 0, 9_999),
+    desiredRetentionPercent: Math.round(desiredRetentionPercent * 10) / 10,
+    maximumIntervalDays: integer(input.maximumIntervalDays, "Maximum interval", 1, 36_500),
+    learningStepsMinutes: steps(input.learningStepsMinutes, "Learning steps"),
+    relearningStepsMinutes: steps(input.relearningStepsMinutes, "Relearning steps")
+  };
+}
+
+function stepUnits(minutes: number[]): StepUnit[] {
+  return minutes.map((step) => `${step}m` as StepUnit);
+}
+
+function schedulerForDeck(database: Database, deckId: number) {
+  const deck = readDecks(database)[String(deckId)];
+  if (!deck || deck.dyn !== 0) throw new Error("Deck not found");
+  const config = deckConfigFor(database, deck);
+  const options = deckOptionsFor(database, deck);
+  const storedWeights = config.fsrsParams6;
+  const weights = Array.isArray(storedWeights) && storedWeights.length > 0
+    && storedWeights.every((weight) => Number.isFinite(Number(weight)))
+    ? storedWeights.map(Number) : [...default_w];
+  return {
+    scheduler: fsrs({
+      request_retention: options.desiredRetentionPercent / 100,
+      maximum_interval: options.maximumIntervalDays,
+      w: weights,
+      enable_fuzz: true,
+      enable_short_term: true,
+      learning_steps: stepUnits(options.learningStepsMinutes),
+      relearning_steps: stepUnits(options.relearningStepsMinutes)
+    }),
+    options
+  };
+}
+
+function startOfTodayMilliseconds() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return start.getTime();
+}
+
+function deckActivityToday(database: Database, deckIds: number[]) {
+  const placeholders = deckIds.map(() => "?").join(",");
+  const start = startOfTodayMilliseconds();
+  const introduced = Number(database.selectValue(
+    `SELECT count(*) FROM cards c
+     WHERE c.did IN (${placeholders})
+       AND (SELECT min(first.id) FROM revlog first WHERE first.cid = c.id) >= ?`,
+    [...deckIds, start]
+  ) ?? 0);
+  const reviews = Number(database.selectValue(
+    `SELECT count(*) FROM revlog r JOIN cards c ON c.id = r.cid
+     WHERE c.did IN (${placeholders}) AND r.id >= ? AND r.type = 1`,
+    [...deckIds, start]
+  ) ?? 0);
+  return { introduced, reviews };
+}
+
+function uniqueDeckConfigId(configs: Record<string, DeckConfigRecord>) {
+  let id = Date.now();
+  while (configs[String(id)]) id += 1;
+  return id;
+}
+
+async function getDeckOptions(deckId: number): Promise<DeckOptions> {
+  await initialize();
+  const database = collection();
+  const deck = readDecks(database)[String(deckId)];
+  if (!deck || deck.dyn !== 0) throw new Error("Deck not found");
+  return deckOptionsFor(database, deck);
+}
+
+async function saveDeckOptions(deckId: number, input: DeckOptionsInput): Promise<DeckOptions> {
+  await initialize();
+  const database = collection();
+  const decks = readDecks(database);
+  const deck = decks[String(deckId)];
+  if (!deck || deck.dyn !== 0) throw new Error("Deck not found");
+  const options = validatedDeckOptions(input);
+  const configs = readDeckConfigs(database);
+  const current = deckConfigFor(database, deck);
+  const ownsCurrentPreset = Number(current.ankiPwaDeckId) === deckId;
+  const configId = ownsCurrentPreset ? Number(deck.conf) : uniqueDeckConfigId(configs);
+  const config = JSON.parse(JSON.stringify(current)) as DeckConfigRecord;
+  const newOptions = recordValue(config.new);
+  const reviewOptions = recordValue(config.rev);
+  const lapseOptions = recordValue(config.lapse);
+  const mod = nowSeconds();
+
+  Object.assign(config, {
+    id: configId,
+    mod,
+    usn: -1,
+    name: `${deck.name.split("::").at(-1) ?? deck.name} options`,
+    ankiPwaDeckId: deckId,
+    desiredRetention: options.desiredRetentionPercent / 100,
+    new: { ...newOptions, perDay: options.newCardsPerDay, delays: options.learningStepsMinutes },
+    rev: { ...reviewOptions, perDay: options.maximumReviewsPerDay, maxIvl: options.maximumIntervalDays },
+    lapse: { ...lapseOptions, delays: options.relearningStepsMinutes }
+  });
+  configs[String(configId)] = config;
+  deck.conf = configId;
+  deck.mod = mod;
+  deck.usn = -1;
+
+  database.transaction("IMMEDIATE", (transaction) => {
+    transaction.exec({
+      sql: "UPDATE col SET decks = ?, dconf = ? WHERE id = 1",
+      bind: [JSON.stringify(decks), JSON.stringify(configs)]
+    });
+    touchCollection(transaction);
+  });
+  return deckOptionsFor(database, deck);
+}
+
+async function resetDeckOptions(deckId: number): Promise<DeckOptions> {
+  await initialize();
+  const database = collection();
+  const decks = readDecks(database);
+  const deck = decks[String(deckId)];
+  if (!deck || deck.dyn !== 0) throw new Error("Deck not found");
+  const configs = readDeckConfigs(database);
+  const previousId = Number(deck.conf);
+  const previous = configs[String(previousId)];
+  deck.conf = DEFAULT_DECK_ID;
+  deck.mod = nowSeconds();
+  deck.usn = -1;
+  if (Number(previous?.ankiPwaDeckId) === deckId
+    && !Object.values(decks).some((candidate) => candidate.id !== deckId && Number(candidate.conf) === previousId)) {
+    delete configs[String(previousId)];
+  }
+  database.transaction("IMMEDIATE", (transaction) => {
+    transaction.exec({
+      sql: "UPDATE col SET decks = ?, dconf = ? WHERE id = 1",
+      bind: [JSON.stringify(decks), JSON.stringify(configs)]
+    });
+    touchCollection(transaction);
+  });
+  return deckOptionsFor(database, deck);
+}
+
 function readNotetypes(database = collection()): Record<string, AnkiNotetype> {
   const json = String(database.selectValue("SELECT models FROM col WHERE id = 1") ?? "{}");
   return JSON.parse(json) as Record<string, AnkiNotetype>;
@@ -515,13 +717,17 @@ function deckSummary(deck: AnkiDeck, database = collection()): DeckSummary {
      FROM cards WHERE did IN (${placeholders})`,
     [now, today, today, ...scopeIds]
   );
+  const options = deckOptionsFor(database, deck);
+  const activity = deckActivityToday(database, scopeIds);
+  const newRemaining = Math.max(0, options.newCardsPerDay - activity.introduced);
+  const reviewRemaining = Math.max(0, options.maximumReviewsPerDay - activity.reviews);
 
   return {
     id: deck.id,
     name: deck.name,
-    newCount: Number(counts?.new_count ?? 0),
+    newCount: Math.min(Number(counts?.new_count ?? 0), newRemaining),
     learningCount: Number(counts?.learning_count ?? 0),
-    reviewCount: Number(counts?.review_count ?? 0),
+    reviewCount: Math.min(Number(counts?.review_count ?? 0), reviewRemaining),
     totalCards: Number(counts?.total_cards ?? 0)
   };
 }
@@ -560,6 +766,142 @@ async function listNotetypes(): Promise<NoteTypeSummary[]> {
       } } : {})
     };
     });
+}
+
+function localDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateSerial(key: string) {
+  const [year, month, day] = key.split("-").map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
+}
+
+function reviewStreak(dayKeys: string[], todayKey: string) {
+  const days = new Set(dayKeys.filter((key) => /^\d{4}-\d{2}-\d{2}$/.test(key)).map(dateSerial));
+  const ordered = [...days].sort((left, right) => left - right);
+  let longest = 0;
+  let run = 0;
+  let previous: number | null = null;
+  for (const day of ordered) {
+    run = previous !== null && day === previous + 1 ? run + 1 : 1;
+    longest = Math.max(longest, run);
+    previous = day;
+  }
+
+  let cursor = dateSerial(todayKey);
+  if (!days.has(cursor)) cursor -= 1;
+  let current = 0;
+  while (days.has(cursor)) {
+    current += 1;
+    cursor -= 1;
+  }
+  return { current, longest };
+}
+
+async function getCollectionStats(deckId: number | null): Promise<CollectionStats> {
+  await initialize();
+  const database = collection();
+  const decks = readDecks(database);
+  let scopeIds: number[] | null = null;
+  let scopeName = "Entire collection";
+  if (deckId !== null) {
+    const deck = decks[String(deckId)];
+    if (!deck || deck.dyn !== 0) throw new Error("Deck not found");
+    scopeIds = deckScopeIds(decks, deckId);
+    scopeName = deck.name;
+  }
+  const condition = scopeIds ? `c.did IN (${scopeIds.map(() => "?").join(",")})` : "1 = 1";
+  const scopeBind = scopeIds ?? [];
+
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - 29);
+  const reviewDays = database.selectObjects(
+    `SELECT date(r.id / 1000, 'unixepoch', 'localtime') AS day,
+       count(*) AS reviews, coalesce(sum(r.time), 0) AS time_ms,
+       sum(CASE WHEN r.ease = 1 THEN 1 ELSE 0 END) AS again_count,
+       sum(CASE WHEN r.ease = 2 THEN 1 ELSE 0 END) AS hard_count,
+       sum(CASE WHEN r.ease = 3 THEN 1 ELSE 0 END) AS good_count,
+       sum(CASE WHEN r.ease = 4 THEN 1 ELSE 0 END) AS easy_count
+     FROM revlog r JOIN cards c ON c.id = r.cid
+     WHERE r.id >= ? AND ${condition}
+     GROUP BY day ORDER BY day`,
+    [start.getTime(), ...scopeBind]
+  );
+  const allDaysSql = `SELECT DISTINCT date(r.id / 1000, 'unixepoch', 'localtime') AS day
+     FROM revlog r JOIN cards c ON c.id = r.cid
+     WHERE r.id > 0 AND ${condition} ORDER BY day`;
+  const allDays = (
+    scopeBind.length
+      ? database.selectObjects(allDaysSql, scopeBind)
+      : database.selectObjects(allDaysSql)
+  ).map((row) => String(row.day));
+
+  const answers = { again: 0, hard: 0, good: 0, easy: 0 };
+  let periodReviews = 0;
+  let periodTime = 0;
+  const byDay = new Map<string, { reviews: number; timeMs: number }>();
+  for (const row of reviewDays) {
+    const reviews = Number(row.reviews ?? 0);
+    const timeMs = Number(row.time_ms ?? 0);
+    periodReviews += reviews;
+    periodTime += timeMs;
+    answers.again += Number(row.again_count ?? 0);
+    answers.hard += Number(row.hard_count ?? 0);
+    answers.good += Number(row.good_count ?? 0);
+    answers.easy += Number(row.easy_count ?? 0);
+    byDay.set(String(row.day), { reviews, timeMs });
+  }
+
+  const today = new Date();
+  const todayKey = localDateKey(today);
+  const todayStats = byDay.get(todayKey) ?? { reviews: 0, timeMs: 0 };
+  const daily = [];
+  for (let offset = 13; offset >= 0; offset -= 1) {
+    const date = new Date(today);
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - offset);
+    const key = localDateKey(date);
+    daily.push({ date: key, ...(byDay.get(key) ?? { reviews: 0, timeMs: 0 }) });
+  }
+
+  const cardCountsSql = `SELECT count(*) AS total,
+       sum(CASE WHEN c.queue = 0 THEN 1 ELSE 0 END) AS new_cards,
+       sum(CASE WHEN c.queue IN (1, 3) THEN 1 ELSE 0 END) AS learning_cards,
+       sum(CASE WHEN c.queue = 2 THEN 1 ELSE 0 END) AS review_cards,
+       sum(CASE WHEN c.queue = -1 THEN 1 ELSE 0 END) AS suspended_cards,
+       sum(CASE WHEN c.queue IN (-2, -3) THEN 1 ELSE 0 END) AS buried_cards
+     FROM cards c WHERE ${condition}`;
+  const cardCounts = scopeBind.length
+    ? database.selectObject(cardCountsSql, scopeBind)
+    : database.selectObject(cardCountsSql);
+  const streak = reviewStreak(allDays, todayKey);
+  return {
+    scopeName,
+    today: todayStats,
+    last30Days: {
+      reviews: periodReviews,
+      timeMs: periodTime,
+      retentionPercent: periodReviews
+        ? Math.round(((periodReviews - answers.again) / periodReviews) * 1_000) / 10
+        : null,
+      answers
+    },
+    streak,
+    cards: {
+      total: Number(cardCounts?.total ?? 0),
+      new: Number(cardCounts?.new_cards ?? 0),
+      learning: Number(cardCounts?.learning_cards ?? 0),
+      review: Number(cardCounts?.review_cards ?? 0),
+      suspended: Number(cardCounts?.suspended_cards ?? 0),
+      buried: Number(cardCounts?.buried_cards ?? 0)
+    },
+    daily
+  };
 }
 
 async function createDeck(nameInput: string): Promise<DeckSummary> {
@@ -703,7 +1045,10 @@ async function collectionMedia(progress: (message: string) => void) {
   const directory = await mediaDirectory(false);
   if (directory) {
     let count = 0;
-    for await (const [name, handle] of directory.entries()) {
+    const entries = (directory as FileSystemDirectoryHandle & {
+      entries(): AsyncIterableIterator<[string, FileSystemHandle]>;
+    }).entries();
+    for await (const [name, handle] of entries) {
       if (handle.kind !== "file") continue;
       progress(`Reading media ${++count}…`);
       const file = await (handle as FileSystemFileHandle).getFile();
@@ -1174,6 +1519,7 @@ function toFsrsCard(row: Record<string, unknown>, database: Database, now: Date)
 }
 
 function previewForCard(row: Record<string, unknown>, database: Database, now = new Date()) {
+  const { scheduler } = schedulerForDeck(database, Number(row.did));
   scheduler.seed = `${String(row.id)}:${String(row.reps)}`;
   return scheduler.repeat(toFsrsCard(row, database, now), now);
 }
@@ -1198,12 +1544,12 @@ function intervalForRevlog(result: RecordLogItem, now: Date) {
   return -Math.max(1, Math.round((result.card.due.getTime() - now.getTime()) / 1000));
 }
 
-function remainingSteps(result: RecordLogItem) {
+function remainingSteps(result: RecordLogItem, options: DeckOptions) {
   if (result.card.state === State.Learning) {
-    return Math.max(0, LEARNING_STEPS.length - result.card.learning_steps);
+    return Math.max(0, options.learningStepsMinutes.length - result.card.learning_steps);
   }
   if (result.card.state === State.Relearning) {
-    return Math.max(0, RELEARNING_STEPS.length - result.card.learning_steps);
+    return Math.max(0, options.relearningStepsMinutes.length - result.card.learning_steps);
   }
   return 0;
 }
@@ -1217,6 +1563,10 @@ async function getNextCard(deckId: number): Promise<StudyCard | null> {
   if (!deck) throw new Error("Deck not found");
   const scopeIds = deckScopeIds(decks, deckId);
   const placeholders = scopeIds.map(() => "?").join(",");
+  const options = deckOptionsFor(database, deck);
+  const activity = deckActivityToday(database, scopeIds);
+  const newRemaining = Math.max(0, options.newCardsPerDay - activity.introduced);
+  const reviewRemaining = Math.max(0, options.maximumReviewsPerDay - activity.reviews);
 
   const row = database.selectObject(
     `SELECT c.id, c.did, c.ord, c.type, c.queue, c.due, c.ivl, c.reps, c.lapses,
@@ -1225,12 +1575,13 @@ async function getNextCard(deckId: number): Promise<StudyCard | null> {
      FROM cards c JOIN notes n ON n.id = c.nid
      WHERE c.did IN (${placeholders}) AND (
        (c.queue = 1 AND c.due <= ?) OR
-       (c.queue IN (2, 3) AND c.due <= ?) OR
-       c.queue = 0
+       (c.queue = 3 AND c.due <= ?) OR
+       (c.queue = 2 AND c.due <= ? AND ? > 0) OR
+       (c.queue = 0 AND ? > 0)
      )
      ORDER BY CASE c.queue WHEN 1 THEN 0 WHEN 3 THEN 0 WHEN 2 THEN 1 ELSE 2 END, c.due, c.id
      LIMIT 1`,
-    [...scopeIds, nowSeconds(), collectionDay(database)]
+    [...scopeIds, nowSeconds(), collectionDay(database), collectionDay(database), reviewRemaining, newRemaining]
   );
   if (!row) return null;
 
@@ -1262,7 +1613,7 @@ async function answerCard(cardId: number, rating: ReviewRating, timeMsInput: num
   await initialize();
   const database = collection();
   const card = database.selectObject(
-    `SELECT c.id, c.type, c.queue, c.due, c.ivl, c.factor, c.reps, c.lapses,
+    `SELECT c.id, c.did, c.type, c.queue, c.due, c.ivl, c.factor, c.reps, c.lapses,
        c.left, c.data,
        (SELECT max(r.id) / 1000 FROM revlog r WHERE r.cid = c.id) AS last_review_seconds
      FROM cards c WHERE c.id = ?`,
@@ -1276,8 +1627,9 @@ async function answerCard(cardId: number, rating: ReviewRating, timeMsInput: num
   const now = new Date();
   const nowSecs = Math.floor(now.getTime() / 1000);
   const today = collectionDay(database);
-  scheduler.seed = `${String(card.id)}:${String(card.reps)}`;
-  const result = scheduler.next(toFsrsCard(card, database, now), now, rating as Grade);
+  const configured = schedulerForDeck(database, Number(card.did));
+  configured.scheduler.seed = `${String(card.id)}:${String(card.reps)}`;
+  const result = configured.scheduler.next(toFsrsCard(card, database, now), now, rating as Grade);
   const type = result.card.state;
   const queue = result.card.state === State.Review ? 2 : 1;
   const due = result.card.state === State.Review
@@ -1287,12 +1639,12 @@ async function answerCard(cardId: number, rating: ReviewRating, timeMsInput: num
     ? result.card.scheduled_days
     : previousInterval;
   const factor = Number(card.factor) || 2500;
-  const left = remainingSteps(result);
+  const left = remainingSteps(result, configured.options);
   const loggedInterval = intervalForRevlog(result, now);
   const data: StoredCardData = {
     s: Number(result.card.stability.toFixed(4)),
     d: Number(result.card.difficulty.toFixed(3)),
-    dr: REQUEST_RETENTION,
+    dr: configured.options.desiredRetentionPercent / 100,
     lrt: nowSecs
   };
 
@@ -1366,6 +1718,15 @@ async function handleRequest(request: DbRequest) {
         await initialize();
         result = deleteStoredDeck(collection(), request.deckId);
         break;
+      case "getDeckOptions":
+        result = await getDeckOptions(request.deckId);
+        break;
+      case "saveDeckOptions":
+        result = await saveDeckOptions(request.deckId, request.options);
+        break;
+      case "resetDeckOptions":
+        result = await resetDeckOptions(request.deckId);
+        break;
       case "addBasicNote":
         result = await addBasicNote(request.deckId, request.front, request.back);
         break;
@@ -1406,6 +1767,9 @@ async function handleRequest(request: DbRequest) {
       case "moveCard":
         await initialize();
         result = moveStoredCard(collection(), request.cardId, request.deckId);
+        break;
+      case "getCollectionStats":
+        result = await getCollectionStats(request.deckId);
         break;
       case "getNextCard":
         result = await getNextCard(request.deckId);

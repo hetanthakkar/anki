@@ -119,6 +119,12 @@ export function deleteDeck(database: Database, deckId: number): void {
   });
 
   for (const id of deckIds) delete decks[String(id)];
+  const deckConfigs = JSON.parse(String(database.selectValue("SELECT dconf FROM col WHERE id = 1") ?? "{}")) as Record<string, Record<string, unknown>>;
+  for (const [configId, config] of Object.entries(deckConfigs)) {
+    const owner = Number(config.ankiPwaDeckId);
+    const stillUsed = Object.values(decks).some((candidate) => Number(candidate.conf) === Number(configId));
+    if (deckIdSet.has(owner) && !stillUsed) delete deckConfigs[configId];
+  }
 
   database.transaction("IMMEDIATE", (transaction) => {
     for (const cardId of cardIds) {
@@ -133,7 +139,10 @@ export function deleteDeck(database: Database, deckId: number): void {
     for (const id of deckIdSet) {
       transaction.exec({ sql: "INSERT INTO graves (usn, oid, type) VALUES (-1, ?, 2)", bind: [id] });
     }
-    transaction.exec({ sql: "UPDATE col SET decks = ? WHERE id = 1", bind: [JSON.stringify(decks)] });
+    transaction.exec({
+      sql: "UPDATE col SET decks = ?, dconf = ? WHERE id = 1",
+      bind: [JSON.stringify(decks), JSON.stringify(deckConfigs)]
+    });
     touchCollection(transaction);
   });
 }

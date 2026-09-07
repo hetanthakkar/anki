@@ -5,10 +5,13 @@ import type {
   BrowseNotesResult,
   BrowserCard,
   CollectionBackupResult,
+  CollectionStats,
   DbCommand,
   DbRequest,
   DbResponse,
   DeckSummary,
+  DeckOptions,
+  DeckOptionsInput,
   LocalCollectionInfo,
   NoteTypeSummary,
   ReviewRating,
@@ -103,6 +106,18 @@ export function deleteDeck(deckId: number) {
   return request<void>({ type: "deleteDeck", deckId });
 }
 
+export function getDeckOptions(deckId: number) {
+  return request<DeckOptions>({ type: "getDeckOptions", deckId });
+}
+
+export function saveDeckOptions(deckId: number, options: DeckOptionsInput) {
+  return request<DeckOptions>({ type: "saveDeckOptions", deckId, options });
+}
+
+export function resetDeckOptions(deckId: number) {
+  return request<DeckOptions>({ type: "resetDeckOptions", deckId });
+}
+
 export function addBasicNote(deckId: number, front: string, back: string) {
   return request<number[]>({ type: "addBasicNote", deckId, front, back });
 }
@@ -145,6 +160,10 @@ export function setCardStatus(cardId: number, status: BrowserCard["status"]) {
 
 export function moveCard(cardId: number, deckId: number) {
   return request<void>({ type: "moveCard", cardId, deckId });
+}
+
+export function getCollectionStats(deckId: number | null = null) {
+  return request<CollectionStats>({ type: "getCollectionStats", deckId });
 }
 
 export function getNextCard(deckId: number) {

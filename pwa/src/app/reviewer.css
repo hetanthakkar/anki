@@ -1,61 +1,84 @@
-/* Reviewer layout based on Michelle's Dribbble Flashcard App.
-   Keep this isolated from the rest of the PWA. */
-
-html:has(.reviewer),
-body:has(.reviewer) {
-  background: #55cdff !important;
+/* Study screens share the application's palette and surfaces. */
+.app-shell:has(> .deck-overview) {
+  width: min(100%, 840px);
+  padding-bottom: max(40px, env(safe-area-inset-bottom));
 }
 
 .app-shell:has(> .reviewer) {
-  width: min(100%, 480px);
-  min-height: 100dvh;
-  padding: max(20px, env(safe-area-inset-top)) 18px max(28px, env(safe-area-inset-bottom));
-  color: #51595e;
+  width: min(100%, 920px);
+  padding-bottom: max(40px, env(safe-area-inset-bottom));
 }
 
-.app-shell:has(> .reviewer) .top-bar {
-  margin: 0 0 24px;
+.deck-overview {
+  gap: 20px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
-.app-shell:has(> .reviewer) .eyebrow {
-  display: none;
+.deck-empty {
+  margin: 0;
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 14px;
 }
 
-.app-shell:has(> .reviewer) .title-group {
-  width: 100%;
-  gap: 12px;
-}
-
-.app-shell:has(> .reviewer) h1 {
-  max-width: 340px;
-  overflow: hidden;
-  color: #fff;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.app-shell:has(> .reviewer) .back-button {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  padding: 0 0 3px;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
+.deck-overview .count-grid {
+  margin-top: 0;
+  border-radius: 12px;
+  background: #f8fafc;
   box-shadow: none;
-  color: #fff;
-  font-size: 30px;
-  backdrop-filter: blur(8px);
 }
 
-.app-shell:has(> .reviewer) .back-button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.28);
+.deck-overview .count-grid > div { padding: 20px 8px; gap: 6px; }
+.deck-overview .count-grid strong { font-size: 32px; font-weight: 650; }
+.deck-overview .count-grid span { font-weight: 500; }
+.deck-overview .study-button { width: min(100%, 320px); margin: 0 auto; }
+.deck-overview .deck-total { margin: -10px 0 0; font-size: 12px; line-height: 1.6; }
+
+.review-top-bar {
+  align-items: center;
+  margin-bottom: 26px;
+  padding-bottom: 18px;
+}
+
+.review-top-bar .title-group {
+  align-items: center;
+  gap: 14px;
+}
+
+.review-top-bar .back-button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  place-items: center;
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(39, 72, 108, 0.08);
+}
+
+.review-top-bar .back-button:hover:not(:disabled) {
+  border-color: #b9cde2;
+  background: #f7fbff;
+  color: var(--accent);
+  box-shadow: 0 6px 18px rgba(39, 72, 108, 0.12);
+}
+
+.review-top-bar .back-button svg {
+  width: 21px;
+  height: 21px;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.review-top-bar h1 {
+  margin-top: 4px;
+  font-size: clamp(25px, 4vw, 32px);
+  line-height: 1.1;
 }
 
 .reviewer {
@@ -64,310 +87,210 @@ body:has(.reviewer) {
   gap: 18px;
 }
 
-.review-progress {
-  order: -1;
-  width: 100%;
-  padding: 1px 2px 2px;
+.review-session-heading {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-inline: 4px;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
-.review-progress-track {
-  height: 10px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.26);
-  box-shadow: inset 0 1px 2px rgba(43, 173, 213, 0.1);
+.review-session-heading > span:first-child {
+  color: var(--text);
+  font-weight: 650;
 }
 
-.review-progress-fill {
-  position: relative;
-  height: 100%;
-  min-width: 0;
-  border-radius: inherit;
-  background: #fff;
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.45);
-  transition: width 360ms cubic-bezier(0.22, 0.7, 0.22, 1);
-}
-
-.review-progress-fill::after {
-  position: absolute;
-  top: 1px;
-  right: 2px;
-  width: 18px;
-  height: 3px;
-  border-radius: 999px;
-  content: "";
-  background: rgba(163, 245, 247, 0.75);
-}
-
-/* Main flashcard */
 .reviewer .study-card {
+  position: relative;
+  height: clamp(430px, 58dvh, 620px);
   overflow: visible;
   border: 0;
-  border-radius: 14px;
+  border-radius: 22px;
   background: transparent;
   box-shadow: none;
-  perspective: 1400px;
+  perspective: 1600px;
 }
 
-.reviewer .study-card-flipper {
-  min-height: 420px;
-  border-radius: 14px 14px 0 0;
-  background: #fff;
-  box-shadow: 0 16px 38px rgba(43, 173, 213, 0.28);
-  transition: transform 520ms cubic-bezier(0.22, 0.7, 0.22, 1);
+.study-card-flipper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 560ms cubic-bezier(0.22, 0.75, 0.25, 1);
+  will-change: transform;
 }
 
-.reviewer .study-card:not(:has(.study-card-prompt)) .study-card-flipper {
-  border-radius: 14px;
+.study-card--flipped .study-card-flipper {
+  transform: rotateY(180deg);
 }
 
-.reviewer .study-card-face {
+.study-card-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) 58px;
   overflow: hidden;
-  border-radius: inherit;
-  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: 0 18px 48px rgba(39, 72, 108, 0.1), 0 2px 7px rgba(39, 72, 108, 0.05);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.study-card-front {
+  transform: rotateY(0deg);
+}
+
+.study-card-back {
+  transform: rotateY(180deg);
+  pointer-events: none;
+}
+
+.study-card--flipped .study-card-front {
+  pointer-events: none;
+}
+
+.study-card--flipped .study-card-back {
+  pointer-events: auto;
+}
+
+.study-card-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 22px;
+  border-bottom: 1px solid #eaf0f6;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.study-card-heading > span:last-child {
+  overflow: hidden;
+  color: #6b7f96;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .reviewer .study-card-frame {
-  min-height: 420px;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   border: 0;
-  border-radius: inherit;
   background: #fff;
+}
+
+.reviewer .study-card-prompt,
+.study-card-face-footer {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-top: 1px solid #eaf0f6;
+  background: #f7fbff;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .reviewer .study-card-prompt {
-  min-height: 58px;
-  padding: 15px 20px;
-  border: 0;
-  border-top: 1px solid #eef0f1;
-  border-radius: 0 0 14px 14px;
-  background: #fff;
-  box-shadow: 0 16px 38px rgba(43, 173, 213, 0.28);
-  color: #2badd5;
-  font-size: 0;
-  font-weight: 800;
-  letter-spacing: 0.075em;
-  text-transform: uppercase;
-  transition: background 150ms ease, color 150ms ease;
-}
-
-.reviewer .study-card-prompt::before {
-  content: "Tap to flip";
-  font-size: 11px;
-}
-
-.reviewer .study-card-prompt::after {
-  content: "↻";
-  margin-left: 9px;
-  color: #55cdff;
-  font-size: 17px;
-  line-height: 1;
+  width: 100%;
+  padding: 14px 20px;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
 }
 
 .reviewer .study-card-prompt:hover {
-  background: #fbfeff;
-  color: #209fc5;
+  background: #edf6ff;
 }
 
-.reviewer .prompt-arrow {
-  display: none;
+.study-card-face-footer {
+  color: var(--text-muted);
 }
 
-/* Anki ratings replace the reference's binary know / don't know actions. */
 .reviewer .answer-buttons {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  animation: reviewer-actions-in 180ms ease-out both;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  animation: review-actions-in 300ms 180ms both;
+}
+
+@keyframes review-actions-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .reviewer .answer-btn {
   display: grid;
-  min-width: 0;
-  min-height: 68px;
-  gap: 3px;
-  align-content: center;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 11px;
-  background: #fff;
-  box-shadow: 0 8px 20px rgba(43, 173, 213, 0.18);
-  color: #51595e;
-  font-size: 13px;
-  font-weight: 800;
-  transition: transform 130ms ease, box-shadow 130ms ease, background 130ms ease;
-}
-
-.reviewer .answer-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  background: #fbfeff;
-  box-shadow: 0 11px 24px rgba(43, 173, 213, 0.24);
-}
-
-.reviewer .answer-btn:active:not(:disabled) {
-  transform: translateY(0) scale(0.985);
-}
-
-.reviewer .answer-btn-label {
-  flex: initial;
-  text-align: center;
+  gap: 7px;
+  min-height: 76px;
+  padding: 14px 8px;
+  border-radius: 14px;
+  font-size: 14px;
 }
 
 .reviewer .answer-btn-interval {
-  color: #babcb9;
-  font-size: 11px;
-  font-weight: 650;
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 1;
 }
-
-.reviewer .answer-btn--1 {
-  color: #a75454;
-}
-
-.reviewer .answer-btn--2 {
-  color: #9b7137;
-}
-
-.reviewer .answer-btn--3 {
-  color: #2d805f;
-}
-
-.reviewer .answer-btn--4 {
-  color: #2badd5;
-}
-
-.reviewer .answer-btn--1::before,
-.reviewer .answer-btn--2::before,
-.reviewer .answer-btn--3::before,
-.reviewer .answer-btn--4::before {
-  width: 24px;
-  height: 3px;
-  margin: 0 auto 4px;
-  border-radius: 999px;
-  content: "";
-}
-
-.reviewer .answer-btn--1::before { background: #e58d8d; }
-.reviewer .answer-btn--2::before { background: #e3b86f; }
-.reviewer .answer-btn--3::before { background: #6bc7a3; }
-.reviewer .answer-btn--4::before { background: #2badd5; }
 
 .reviewer .review-stats-panel {
-  display: none;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 4px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.38);
+  box-shadow: none;
+}
+
+.reviewer .review-stat-label,
+.reviewer .review-stat-count {
+  color: var(--text-muted);
+}
+
+.reviewer .review-stat-bar {
+  background: #dce6f0;
 }
 
 .reviewer .typed-answer-panel,
 .reviewer .typed-answer-result {
-  border: 0;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 8px 20px rgba(43, 173, 213, 0.18);
-  color: #51595e;
-}
-
-.reviewer .typed-answer-panel {
-  padding: 14px;
-}
-
-.reviewer .typed-answer-panel input {
-  border-color: #d2d4d5;
-  background: #fff;
-  color: #51595e;
-}
-
-.reviewer .typed-answer-panel input:focus {
-  border-color: #2badd5;
-  box-shadow: 0 0 0 3px rgba(43, 173, 213, 0.14);
-}
-
-.reviewer .show-answer {
-  min-height: 52px;
-  border-radius: 11px;
-  background: #2badd5;
-  box-shadow: 0 8px 20px rgba(43, 173, 213, 0.2);
+  border-color: var(--border);
+  background: var(--surface);
+  box-shadow: none;
 }
 
 .reviewer .congratulations {
-  margin-top: 50px;
-  padding: 34px 24px;
-  border: 0;
-  border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 16px 38px rgba(43, 173, 213, 0.28);
-  color: #51595e;
+  margin-top: 20px;
+  padding: 60px 24px;
 }
 
-.reviewer .congratulations .muted {
-  color: #8a9296;
+@media (max-height: 760px) and (min-width: 601px) {
+  .reviewer .study-card { height: clamp(390px, 52dvh, 480px); }
 }
 
-.reviewer .congratulations .secondary-button {
-  border-color: #d2d4d5;
-  color: #2badd5;
-}
-
-@keyframes reviewer-actions-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (min-width: 700px) {
-  .app-shell:has(> .reviewer) {
-    padding-top: 42px;
-  }
-
-  .reviewer .study-card-flipper,
-  .reviewer .study-card-frame {
-    min-height: 440px;
-  }
-}
-
-@media (max-width: 480px) {
-  .app-shell:has(> .reviewer) {
-    padding: max(14px, env(safe-area-inset-top)) 14px max(22px, env(safe-area-inset-bottom));
-  }
-
-  .app-shell:has(> .reviewer) .top-bar {
-    margin-bottom: 16px;
-  }
-
-  .app-shell:has(> .reviewer) h1 {
-    font-size: 18px;
-  }
-
-  .reviewer {
-    gap: 14px;
-  }
-
-  .reviewer .study-card-flipper,
-  .reviewer .study-card-frame {
-    min-height: min(52dvh, 410px);
-  }
-
-  .reviewer .answer-btn {
-    min-height: 62px;
-  }
-}
-
-@media (max-height: 700px) {
-  .reviewer .study-card-flipper,
-  .reviewer .study-card-frame {
-    min-height: 320px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .reviewer .study-card-flipper,
-  .reviewer .answer-btn,
-  .review-progress-fill {
-    transition: none;
-  }
-
-  .reviewer .answer-buttons {
-    animation: none;
-  }
+@media (max-width: 600px) {
+  .deck-overview { padding: 20px 16px; gap: 20px; }
+  .deck-overview .count-grid strong { font-size: 28px; }
+  .deck-overview .count-grid > div { padding: 20px 6px; }
+  .review-top-bar { margin-bottom: 20px; padding-bottom: 16px; }
+  .review-top-bar .title-group { gap: 11px; }
+  .review-top-bar .back-button { width: 40px; height: 40px; }
+  .review-top-bar h1 { font-size: 25px; }
+  .reviewer { gap: 14px; }
+  .review-session-heading { font-size: 12px; }
+  .reviewer .study-card { height: clamp(380px, 56svh, 510px); }
+  .study-card-heading { padding: 16px 18px; }
+  .reviewer .answer-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .reviewer .answer-btn { min-height: 64px; }
+  .reviewer .review-stats-panel { padding: 16px; }
 }

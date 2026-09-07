@@ -14,6 +14,21 @@ export type DeckSummary = {
   totalCards: number;
 };
 
+export type DeckOptions = {
+  deckId: number;
+  deckName: string;
+  presetName: string;
+  usingDefaultPreset: boolean;
+  newCardsPerDay: number;
+  maximumReviewsPerDay: number;
+  desiredRetentionPercent: number;
+  maximumIntervalDays: number;
+  learningStepsMinutes: number[];
+  relearningStepsMinutes: number[];
+};
+
+export type DeckOptionsInput = Omit<DeckOptions, "deckId" | "deckName" | "presetName" | "usingDefaultPreset">;
+
 export type CardState = "new" | "learning" | "review" | "relearning";
 
 export type StudyCard = {
@@ -36,6 +51,42 @@ export type StudyCard = {
 };
 
 export type ReviewRating = 1 | 2 | 3 | 4;
+
+export type CollectionStats = {
+  scopeName: string;
+  today: {
+    reviews: number;
+    timeMs: number;
+  };
+  last30Days: {
+    reviews: number;
+    timeMs: number;
+    retentionPercent: number | null;
+    answers: {
+      again: number;
+      hard: number;
+      good: number;
+      easy: number;
+    };
+  };
+  streak: {
+    current: number;
+    longest: number;
+  };
+  cards: {
+    total: number;
+    new: number;
+    learning: number;
+    review: number;
+    suspended: number;
+    buried: number;
+  };
+  daily: Array<{
+    date: string;
+    reviews: number;
+    timeMs: number;
+  }>;
+};
 
 export type NoteTypeSummary = {
   id: number;
@@ -108,6 +159,9 @@ export type DbCommand =
   | { type: "createDeck"; name: string }
   | { type: "renameDeck"; deckId: number; name: string }
   | { type: "deleteDeck"; deckId: number }
+  | { type: "getDeckOptions"; deckId: number }
+  | { type: "saveDeckOptions"; deckId: number; options: DeckOptionsInput }
+  | { type: "resetDeckOptions"; deckId: number }
   | { type: "addNote"; deckId: number; notetypeId: number; fields: string[] }
   | { type: "addBasicNote"; deckId: number; front: string; back: string }
   | { type: "addClozeNote"; deckId: number; text: string; extra: string }
@@ -119,6 +173,7 @@ export type DbCommand =
   | { type: "deleteNote"; noteId: number }
   | { type: "setCardStatus"; cardId: number; status: BrowserCard["status"] }
   | { type: "moveCard"; cardId: number; deckId: number }
+  | { type: "getCollectionStats"; deckId: number | null }
   | { type: "getNextCard"; deckId: number }
   | { type: "answerCard"; cardId: number; rating: ReviewRating; timeMs: number };
 

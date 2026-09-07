@@ -148,7 +148,7 @@ try {
   await until('document.querySelector("iframe")');
   assert.match(await evaluate('document.querySelector("iframe").srcdoc'), /Hello import/);
   await button("Show answer");
-  let source = await evaluate('document.querySelector("iframe").srcdoc');
+  let source = await evaluate('document.querySelector(".study-card-back iframe").srcdoc');
   assert.match(source, /Imported answer/); assert.match(source, /data:image\/svg\+xml;base64,/); assert.match(source, /data:audio\/wav;base64,/);
   assert.match(source, /style="background:url\(data:image\/svg\+xml;base64,[^"]+\)"/);
   assert.equal(await evaluate('document.querySelector("iframe").getAttribute("sandbox")'), "");
@@ -160,7 +160,7 @@ try {
   await button("Study now");
   await until('document.querySelector("iframe")');
   await button("Show answer");
-  source = await evaluate('document.querySelector("iframe").srcdoc');
+  source = await evaluate('document.querySelector(".study-card-back iframe").srcdoc');
   assert.match(source, /data:image\/svg\+xml;base64,/); assert.match(source, /data:audio\/wav;base64,/);
   await evaluate('[...document.querySelectorAll("button")].find((button) => button.textContent.includes("Easy")).click()');
   await until('!document.querySelector("iframe")');

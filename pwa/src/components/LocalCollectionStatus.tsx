@@ -15,19 +15,21 @@ import {
   storeMedia
 } from "@/lib/db/client";
 import type { DeckSummary, LocalCollectionInfo, NoteTypeSummary, ReviewRating, StudyCard } from "@/lib/db/types";
-import { CardBrowser } from "./CardBrowser";
 import { CollectionBackup } from "./CollectionBackup";
+import { DeckOptionsEditor } from "./DeckOptionsEditor";
 import { ImportDeck } from "./ImportDeck";
+import { NoteFieldEditor } from "./NoteFieldEditor";
+import { nextClozeNumber } from "@/lib/note-editing";
 import { emptyImageOcclusionDraft, ImageOcclusionEditor } from "./ImageOcclusionEditor";
 import type { ImageOcclusionDraft } from "./ImageOcclusionEditor";
-import { SharedDecks } from "./SharedDecks";
+import { StatsDashboard } from "./StatsDashboard";
 
 type LoadState =
   | { status: "loading" }
   | { status: "ready"; info: LocalCollectionInfo; decks: DeckSummary[]; notetypes: NoteTypeSummary[] }
   | { status: "error"; message: string };
 
-type Screen = "decks" | "browse" | "settings" | "deck" | "create-deck" | "manage-deck" | "add-note" | "review" | "import" | "shared";
+type Screen = "decks" | "stats" | "settings" | "deck" | "deck-options" | "create-deck" | "manage-deck" | "add-note" | "review" | "import";
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -86,6 +88,7 @@ export function LocalCollectionStatus() {
   const [imageOcclusion, setImageOcclusion] = useState<ImageOcclusionDraft>(emptyImageOcclusionDraft);
   const [studyCard, setStudyCard] = useState<StudyCard | null>(null);
   const [studyComplete, setStudyComplete] = useState(false);
+  const [sessionReviews, setSessionReviews] = useState(0);
   const [answerShown, setAnswerShown] = useState(false);
   const [typedAnswer, setTypedAnswer] = useState("");
   const [busy, setBusy] = useState(false);
@@ -217,7 +220,7 @@ export function LocalCollectionStatus() {
   };
 
   const removeSelectedDeck = async () => {
-    if (!selectedDeck || selectedDeck.id === 1 || busy) return;
+    if (state.status !== "ready" || !selectedDeck || selectedDeck.id === 1 || busy) return;
     const hasChildren = state.decks.some((deck) => deck.id !== selectedDeck.id && deck.name.toLocaleLowerCase().startsWith(`${selectedDeck.name.toLocaleLowerCase()}::`));
     const scope = hasChildren ? "this deck, its subdecks, and their cards" : "this deck and its cards";
     if (!window.confirm(`Delete ${scope}? Notes that have no cards left will also be deleted. This cannot be undone.`)) return;
@@ -287,6 +290,7 @@ export function LocalCollectionStatus() {
       const card = await getNextCard(selectedDeckId);
       setStudyCard(card);
       setStudyComplete(card === null);
+      setSessionReviews(0);
       setAnswerShown(false);
       setTypedAnswer("");
       shownAt.current = Date.now();
@@ -304,6 +308,7 @@ export function LocalCollectionStatus() {
     setActionError(null);
     try {
       await answerCard(studyCard.id, rating, Date.now() - shownAt.current);
+      setSessionReviews((count) => count + 1);
       const next = await getNextCard(selectedDeckId);
       setStudyCard(next);
       setStudyComplete(next === null);
@@ -319,7 +324,7 @@ export function LocalCollectionStatus() {
   };
 
   if (state.status === "loading") {
-    return <main className="app-shell"><div className="panel muted">Opening local collection…</div></main>;
+    return <main className="app-shell"><div className="panel collection-loading" role="status"><span className="loading-indicator" aria-hidden="true" /><strong>Opening your collection</strong><span className="muted">Getting your decks ready…</span></div></main>;
   }
 
   if (state.status === "error") {
@@ -333,35 +338,38 @@ export function LocalCollectionStatus() {
     );
   }
 
-  const showBack = screen !== "decks" && screen !== "browse" && screen !== "settings";
-  const title = screen === "import" ? "Import" : screen === "shared" ? "Shared decks" : screen === "browse" ? "Browse" : screen === "settings" ? "Settings"
-    : screen === "decks" || screen === "create-deck" ? "Decks" : selectedDeck?.name ?? "Deck";
+  const showBack = screen !== "decks" && screen !== "stats" && screen !== "settings";
+  const title = screen === "import" ? "Import"
+    : screen === "stats" ? "Stats" : screen === "settings" ? "Settings" : screen === "deck-options" ? "Deck options"
+      : screen === "decks" || screen === "create-deck" ? "Decks" : selectedDeck?.name ?? "Deck";
 
   return (
     <main className="app-shell">
-      <header className="top-bar">
+      <header className={screen === "review" ? "top-bar review-top-bar" : "top-bar"}>
         <div className="title-group">
           {showBack && (
             <button className="back-button" type="button" disabled={busy}
               onClick={screen === "deck" || !selectedDeckId ? goToDecks : () => goToDeck(selectedDeckId)} aria-label="Back">
-              ‹
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
             </button>
           )}
           <div>
-            <p className="eyebrow">ANKI PWA</p>
+            <p className="eyebrow">ANKI / {screen === "review" ? "STUDY SESSION" : "YOUR COLLECTION"}</p>
             <h1>{title}</h1>
           </div>
         </div>
         {screen === "decks" && (
           <div className="top-actions">
-            <button className="secondary-button" type="button"
-              onClick={() => { setScreen("shared"); setActionError(null); }}>Shared</button>
             <button className="secondary-button" type="button" onClick={() => setScreen("import")}>Import</button>
-            <button className="icon-button" type="button" onClick={() => { setDeckName(""); setScreen("create-deck"); setActionError(null); }} aria-label="Add deck">+</button>
+            <button className="primary-button create-deck-button" type="button" onClick={() => { setDeckName(""); setScreen("create-deck"); setActionError(null); }} aria-label="Add deck"><span aria-hidden="true">+</span> Create deck</button>
           </div>
         )}
         {screen === "deck" && (
           <div className="top-actions">
+            <button className="secondary-button" type="button" disabled={busy}
+              onClick={() => { setScreen("deck-options"); setActionError(null); }}>Options</button>
             <button className="secondary-button" type="button" disabled={busy} onClick={openDeckManagement}>Manage</button>
             <button className="icon-button" type="button" onClick={() => {
               const initial = state.notetypes.find((notetype) => notetype.id === noteTypeId) ?? state.notetypes[0];
@@ -383,9 +391,10 @@ export function LocalCollectionStatus() {
           <div className="storage-banner">
             <span className={state.info.persistent ? "status-dot good" : "status-dot warning"} />
             <span>{state.info.persistent ? "Stored locally on this device" : "Temporary storage fallback"}</span>
-            <span className="storage-meta">Anki schema {state.info.schemaVersion} · SQLite {state.info.sqliteVersion}</span>
+            <span className="storage-meta">{state.info.persistent ? "Ready for offline study" : "Export a backup to keep your cards safe"}</span>
           </div>
           <section className="deck-list" aria-label="Decks">
+            <div className="deck-list-heading" aria-hidden="true"><span>YOUR DECKS</span><span className="deck-counts"><span>New</span><span>Learning</span><span>Review</span></span></div>
             {state.decks.map((deck) => {
               const depth = Math.max(0, deck.name.split("::").length - 1);
               return (
@@ -393,7 +402,7 @@ export function LocalCollectionStatus() {
                   <span className="deck-name" style={{ paddingInlineStart: `${depth * 18}px` }}>
                     {depth > 0 ? "↳ " : ""}{leafDeckName(deck.name)}
                   </span>
-                  <span className="deck-counts" aria-label={`${deck.totalCards} cards`}>
+                  <span className="deck-counts" aria-label={`${deck.newCount} new, ${deck.learningCount} learning, ${deck.reviewCount} to review; ${deck.totalCards} cards total`}>
                     <span className="new-count">{deck.newCount}</span>
                     <span className="learn-count">{deck.learningCount}</span>
                     <span className="review-count">{deck.reviewCount}</span>
@@ -408,9 +417,7 @@ export function LocalCollectionStatus() {
       {screen === "import" && <ImportDeck persistent={state.info.persistent} onBusyChange={setBusy}
         onImported={refreshCollection} onDone={goToDecks} />}
 
-      {screen === "shared" && <SharedDecks onImport={() => setScreen("import")} />}
-
-      {screen === "browse" && <CardBrowser decks={state.decks} onCollectionChanged={refreshCollection} />}
+      {screen === "stats" && <StatsDashboard decks={state.decks} />}
 
       {screen === "settings" && <CollectionBackup persistent={state.info.persistent} onBusyChange={setBusy} />}
 
@@ -448,15 +455,20 @@ export function LocalCollectionStatus() {
         </section>
       )}
 
+      {screen === "deck-options" && selectedDeck && (
+        <DeckOptionsEditor deck={selectedDeck} onChanged={async () => { await refreshDecks(); }} />
+      )}
+
       {screen === "deck" && selectedDeck && (
         <section className="deck-overview">
           <div className="count-grid">
-            <div><strong className="new-count">{selectedDeck.newCount}</strong><span>New</span></div>
+            <div><strong className="new-count">{selectedDeck.newCount}</strong><span>New cards</span></div>
             <div><strong className="learn-count">{selectedDeck.learningCount}</strong><span>Learning</span></div>
             <div><strong className="review-count">{selectedDeck.reviewCount}</strong><span>To review</span></div>
           </div>
+          {selectedDeck.totalCards === 0 && <p className="deck-empty">Add a card to start studying.</p>}
           {actionError && <p className="form-error panel" role="alert">{actionError}</p>}
-          <button className="primary-button study-button" type="button" disabled={busy} onClick={beginStudy}>{busy ? "Opening…" : "Study now"}</button>
+          <button className="primary-button study-button" type="button" disabled={busy || selectedDeck.totalCards === 0} onClick={beginStudy}>{busy ? "Opening…" : "Study now"}</button>
           <p className="deck-total">{selectedDeck.totalCards} {selectedDeck.totalCards === 1 ? "card" : "cards"} total, including subdecks</p>
         </section>
       )}
@@ -477,10 +489,10 @@ export function LocalCollectionStatus() {
           {selectedNotetype.kind === "image-occlusion" ? (
             <ImageOcclusionEditor value={imageOcclusion} disabled={busy} onChange={setImageOcclusion} />
           ) : selectedNotetype.fields.map((field, index) => (
-            <div className="field-editor" key={`${selectedNotetype.id}-${field}`}>
-              <label htmlFor={`note-field-${index}`}>{field}</label>
-              <textarea id={`note-field-${index}`} autoFocus={index === 0} rows={index === 0 ? 5 : 4} value={noteFields[index] ?? ""} onChange={(event) => setNoteFields((current) => current.map((value, fieldIndex) => fieldIndex === index ? event.target.value : value))} placeholder={selectedNotetype.kind === "cloze" && index === 0 ? "The capital is {{c1::Paris}}." : undefined} />
-            </div>
+            <NoteFieldEditor key={`${selectedNotetype.id}-${field}`} id={`note-field-${index}`} label={field}
+              autoFocus={index === 0} disabled={busy} value={noteFields[index] ?? ""}
+              clozeNumber={selectedNotetype.kind === "cloze" ? nextClozeNumber(noteFields) : undefined}
+              onChange={(html) => setNoteFields((current) => current.map((value, fieldIndex) => fieldIndex === index ? html : value))} />
           ))}
           {selectedNotetype.kind !== "image-occlusion" && <label className="media-picker" htmlFor="media-files">
             <span>Attach image or audio</span>
@@ -498,26 +510,32 @@ export function LocalCollectionStatus() {
           {studyComplete ? (
             <div className="panel congratulations">
               <span className="complete-mark">✓</span>
-              <h2>Congratulations!</h2>
+              <h2>You’re all caught up.</h2>
               <p className="muted">You have finished this deck for now.</p>
               <button className="secondary-button" type="button" onClick={() => selectedDeckId && goToDeck(selectedDeckId)}>Back to deck</button>
             </div>
           ) : studyCard ? (
             <>
-              <div className="study-card">
-                <div className={`study-card-flipper${answerShown ? " study-card-flipper--flipped" : ""}`}>
-                  <div className="study-card-face study-card-front">
-                    <iframe className="study-card-frame" sandbox="" title="Card question" srcDoc={cardDocument(studyCard.questionHtml, studyCard.cardCss)} />
-                  </div>
-                  <div className="study-card-face study-card-back">
-                    <iframe className="study-card-frame" sandbox="" title="Card answer" srcDoc={cardDocument(studyCard.answerHtml, studyCard.cardCss)} />
-                  </div>
+              <div className="review-session-heading"><span>{answerShown ? "Check your answer" : "Take a moment to recall"}</span><span role="status">{sessionReviews} {sessionReviews === 1 ? "review" : "reviews"} completed</span></div>
+              <div className={`study-card${answerShown ? " study-card--flipped" : ""}`}>
+                <div className="study-card-flipper">
+                  <article className="study-card-face study-card-front" aria-hidden={answerShown} inert={answerShown || undefined}>
+                    <div className="study-card-heading"><span>QUESTION</span><span>{selectedDeck ? leafDeckName(selectedDeck.name) : "Flashcard"}</span></div>
+                    <iframe className="study-card-frame" sandbox="" title="Card question" tabIndex={answerShown ? -1 : 0}
+                      srcDoc={cardDocument(studyCard.questionHtml, studyCard.cardCss)} />
+                    {!studyCard.typedAnswer ? (
+                      <button className="study-card-prompt" type="button" onClick={() => setAnswerShown(true)}>
+                        Show answer <span className="prompt-arrow" aria-hidden="true">→</span>
+                      </button>
+                    ) : <div className="study-card-face-footer">Type your answer below</div>}
+                  </article>
+                  <article className="study-card-face study-card-back" aria-hidden={!answerShown} inert={!answerShown || undefined}>
+                    <div className="study-card-heading"><span>ANSWER</span><span>{selectedDeck ? leafDeckName(selectedDeck.name) : "Flashcard"}</span></div>
+                    <iframe className="study-card-frame" sandbox="" title="Card answer" tabIndex={answerShown ? 0 : -1}
+                      srcDoc={cardDocument(studyCard.answerHtml, studyCard.cardCss)} />
+                    <div className="study-card-face-footer">Choose how well you remembered</div>
+                  </article>
                 </div>
-                {!answerShown && !studyCard.typedAnswer && (
-                  <button className="study-card-prompt" type="button" onClick={() => setAnswerShown(true)}>
-                    Click to see back <span className="prompt-arrow">→</span>
-                  </button>
-                )}
               </div>
               {!answerShown && studyCard.typedAnswer && (
                 <>
@@ -553,7 +571,7 @@ export function LocalCollectionStatus() {
               {selectedDeck && (
                 <div className="review-stats-panel">
                   <div className="review-stat">
-                    <span className="review-stat-label">Mastered</span>
+                    <span className="review-stat-label">Introduced</span>
                     <div className="review-stat-bar"><div className="review-stat-fill review-stat-fill--mastered" style={{ width: selectedDeck.totalCards ? `${((selectedDeck.totalCards - selectedDeck.newCount) / selectedDeck.totalCards) * 100}%` : "0%" }} /></div>
                     <span className="review-stat-count">{selectedDeck.totalCards - selectedDeck.newCount} of {selectedDeck.totalCards}</span>
                   </div>
@@ -574,15 +592,14 @@ export function LocalCollectionStatus() {
         </section>
       )}
 
-      {(screen === "decks" || screen === "browse" || screen === "settings") && (
-        <footer className="bottom-nav" aria-label="Primary navigation">
-          <button className={`nav-item ${screen === "decks" ? "active" : ""}`} type="button" onClick={goToDecks}>Decks</button>
-          <button className={`nav-item ${screen === "browse" ? "active" : ""}`} type="button"
-            onClick={() => { setScreen("browse"); setSelectedDeckId(null); setActionError(null); }}>Browse</button>
-          <button className="nav-item" type="button" disabled>Stats</button>
-          <button className={`nav-item ${screen === "settings" ? "active" : ""}`} type="button"
+      {(screen === "decks" || screen === "stats" || screen === "settings") && (
+        <nav className="bottom-nav" aria-label="Primary navigation">
+          <button className={`nav-item ${screen === "decks" ? "active" : ""}`} aria-current={screen === "decks" ? "page" : undefined} type="button" onClick={goToDecks}>Decks</button>
+          <button className={`nav-item ${screen === "stats" ? "active" : ""}`} aria-current={screen === "stats" ? "page" : undefined} type="button"
+            onClick={() => { setScreen("stats"); setSelectedDeckId(null); setActionError(null); }}>Stats</button>
+          <button className={`nav-item ${screen === "settings" ? "active" : ""}`} aria-current={screen === "settings" ? "page" : undefined} type="button"
             onClick={() => { setScreen("settings"); setSelectedDeckId(null); setActionError(null); }}>Settings</button>
-        </footer>
+        </nav>
       )}
     </main>
   );

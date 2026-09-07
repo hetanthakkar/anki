@@ -36,8 +36,9 @@ async function until(expression) {
   throw new Error(`Timed out: ${expression}\n${await evaluate("document.body.innerText")}`);
 }
 async function click(label) {
-  await until(`[...document.querySelectorAll('button')].some((button) => button.textContent.trim().endsWith(${JSON.stringify(label)}) && !button.disabled)`);
-  await evaluate(`[...document.querySelectorAll('button')].find((button) => button.textContent.trim().endsWith(${JSON.stringify(label)})).click()`);
+  const matchesLabel = `(button) => [...button.querySelectorAll('span')].some((span) => span.textContent.trim() === ${JSON.stringify(label)}) || button.textContent.trim() === ${JSON.stringify(label)}`;
+  await until(`[...document.querySelectorAll('button')].some((button) => (${matchesLabel})(button) && !button.disabled)`);
+  await evaluate(`[...document.querySelectorAll('button')].find((button) => (${matchesLabel})(button) && !button.disabled).click()`);
 }
 async function setValue(selector, value) {
   await evaluate(`(() => {
@@ -134,7 +135,7 @@ try {
   let source = await evaluate('document.querySelector("iframe").srcdoc');
   assert.match(source, /Diagram header/); assert.match(source, /io-active/); assert.match(source, /data:image\/svg\+xml;base64,/);
   await click("Show answer");
-  source = await evaluate('document.querySelector("iframe").srcdoc');
+  source = await evaluate('document.querySelector(".study-card-back iframe").srcdoc');
   assert.match(source, /io-highlight/); assert.match(source, /Diagram details/);
 
   console.log(JSON.stringify({ stockChoices: 6, reversedCards: 2, optionalReverse: true,
