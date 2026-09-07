@@ -64,6 +64,42 @@ body:has(.reviewer) {
   gap: 18px;
 }
 
+.review-progress {
+  order: -1;
+  width: 100%;
+  padding: 1px 2px 2px;
+}
+
+.review-progress-track {
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.26);
+  box-shadow: inset 0 1px 2px rgba(43, 173, 213, 0.1);
+}
+
+.review-progress-fill {
+  position: relative;
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  background: #fff;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.45);
+  transition: width 360ms cubic-bezier(0.22, 0.7, 0.22, 1);
+}
+
+.review-progress-fill::after {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  width: 18px;
+  height: 3px;
+  border-radius: 999px;
+  content: "";
+  background: rgba(163, 245, 247, 0.75);
+}
+
 /* Main flashcard */
 .reviewer .study-card {
   overflow: visible;
@@ -326,7 +362,8 @@ body:has(.reviewer) {
 
 @media (prefers-reduced-motion: reduce) {
   .reviewer .study-card-flipper,
-  .reviewer .answer-btn {
+  .reviewer .answer-btn,
+  .review-progress-fill {
     transition: none;
   }
 
