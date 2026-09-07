@@ -82,6 +82,66 @@ function request<T>(command: DbCommand, transfer: Transferable[] = [], progress?
   });
 }
 
+export type FullSyncCollectionSnapshot = {
+  bytes: ArrayBuffer;
+  notes: number;
+  cards: number;
+  reviews: number;
+};
+
+export type FullSyncCollectionCounts = Omit<FullSyncCollectionSnapshot, "bytes">;
+
+type SyncWorkerResponse = {
+  id: number;
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+};
+
+function stopCollectionWorker() {
+  if (pending.size) throw new Error("Wait for the current collection operation to finish before syncing");
+  worker?.terminate();
+  worker = null;
+}
+
+function syncWorkerRequest<T>(
+  message: { type: "prepareUpload" } | { type: "replaceCollection"; bytes: ArrayBuffer },
+  transfer: Transferable[] = []
+): Promise<T> {
+  if (typeof window === "undefined") throw new Error("AnkiWeb sync is only available in the browser");
+  stopCollectionWorker();
+  const syncWorker = new Worker(new URL("./anki-sync.worker.ts", import.meta.url), { type: "module" });
+  const id = ++requestId;
+
+  return new Promise<T>((resolve, reject) => {
+    const finish = () => syncWorker.terminate();
+    syncWorker.addEventListener("message", (event: MessageEvent<SyncWorkerResponse>) => {
+      if (event.data.id !== id) return;
+      finish();
+      if (event.data.ok) resolve(event.data.result as T);
+      else reject(new Error(event.data.error ?? "Anki sync database operation failed"));
+    });
+    syncWorker.addEventListener("error", (event) => {
+      finish();
+      reject(new Error(event.message || "Anki sync database worker crashed"));
+    });
+    try {
+      syncWorker.postMessage({ ...message, id }, transfer);
+    } catch (error) {
+      finish();
+      reject(error);
+    }
+  });
+}
+
+export function prepareCollectionForAnkiWeb() {
+  return syncWorkerRequest<FullSyncCollectionSnapshot>({ type: "prepareUpload" });
+}
+
+export function replaceCollectionFromAnkiWeb(bytes: ArrayBuffer) {
+  return syncWorkerRequest<FullSyncCollectionCounts>({ type: "replaceCollection", bytes }, [bytes]);
+}
+
 export function initLocalCollection() {
   return request<LocalCollectionInfo>({ type: "init" });
 }
