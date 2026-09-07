@@ -93,6 +93,9 @@ function prepareUpload(database: Database, sqlite3: SyncSqlite) {
   const notes = Number(database.selectValue("SELECT count(*) FROM notes") ?? 0);
   const cards = Number(database.selectValue("SELECT count(*) FROM cards") ?? 0);
   const reviews = Number(database.selectValue("SELECT count(*) FROM revlog") ?? 0);
+  const currentUsn = Number(database.selectValue("SELECT usn FROM col WHERE id = 1") ?? -1);
+  const uploadUsn = Number.isInteger(currentUsn) ? Math.max(0, currentUsn + 1) : 0;
+  const syncTime = Date.now();
 
   database.exec("BEGIN IMMEDIATE");
   try {
@@ -100,12 +103,21 @@ function prepareUpload(database: Database, sqlite3: SyncSqlite) {
     // The transaction is rolled back after sqlite3_js_db_export(), so normal
     // local editing state is not changed if the network upload later fails.
     database.exec("DELETE FROM graves");
-    database.exec("UPDATE notes SET usn = 0 WHERE usn < 0");
-    database.exec("UPDATE cards SET usn = 0 WHERE usn < 0");
-    database.exec("UPDATE revlog SET usn = 0 WHERE usn < 0");
+    database.exec("UPDATE notes SET usn = 0 WHERE usn = -1");
+    database.exec("UPDATE cards SET usn = 0 WHERE usn = -1");
+    database.exec("UPDATE revlog SET usn = 0 WHERE usn = -1");
     database.exec({
-      sql: "UPDATE col SET models = ?, decks = ?, dconf = ?, tags = ?, usn = 0, ls = scm WHERE id = 1",
-      bind: [preparedJson(database, "models"), preparedJson(database, "decks"), preparedJson(database, "dconf"), preparedTags(database)]
+      sql: "UPDATE col SET models = ?, decks = ?, dconf = ?, tags = ?, usn = ?, mod = ?, scm = ?, ls = ? WHERE id = 1",
+      bind: [
+        preparedJson(database, "models"),
+        preparedJson(database, "decks"),
+        preparedJson(database, "dconf"),
+        preparedTags(database),
+        uploadUsn,
+        syncTime,
+        syncTime,
+        syncTime
+      ]
     });
 
     const bytes = sqlite3.capi.sqlite3_js_db_export(database.pointer).slice();
@@ -139,7 +151,10 @@ function replaceCollection(target: Database, sqlite3: SyncSqlite, input: ArrayBu
     validateDownloadedCollection(source);
 
     const backup = sqlite3.capi.sqlite3_backup_init(target.pointer, "main", source.pointer, "main");
-    if (!backup) target.checkRc(sqlite3.capi.sqlite3_errcode(target.pointer));
+    if (!backup) {
+      target.checkRc(sqlite3.capi.sqlite3_errcode(target.pointer));
+      throw new Error("Could not start SQLite collection replacement");
+    }
     let stepRc: number;
     let finishRc: number;
     try {
