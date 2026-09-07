@@ -7,6 +7,7 @@ import { exportCollection, replaceLocalCollection } from "@/lib/db/client";
 
 const CLIENT_VERSION = "Anki PWA 0.1";
 const MEDIA_BATCH_SIZE = 25;
+const MEDIA_TARGET_ZIP_BYTES = Math.floor(2.5 * 1024 * 1024);
 const MAX_MEDIA_CHANGE_PAGES = 10_000;
 
 export const ANKIWEB_HOST_KEY_STORAGE = "anki-pwa-ankiweb-host-key";
@@ -133,17 +134,28 @@ function mediaUploadZip(changes: MediaUploadChange[]) {
   return zipSync(archive, { level: 0 });
 }
 
+function nextMediaUploadBatch(changes: MediaUploadChange[], offset: number) {
+  const batch: MediaUploadChange[] = [];
+  let bytes = 0;
+  for (let index = offset; index < changes.length && batch.length < MEDIA_BATCH_SIZE; index += 1) {
+    if (batch.length && bytes > MEDIA_TARGET_ZIP_BYTES) break;
+    const change = changes[index];
+    batch.push(change);
+    bytes += change.bytes?.length ?? 0;
+  }
+  return batch;
+}
+
 async function uploadMediaChanges(hostKey: string, changes: MediaUploadChange[], progress: (message: string) => void) {
-  let processed = 0;
-  for (let offset = 0; offset < changes.length; offset += MEDIA_BATCH_SIZE) {
-    const batch = changes.slice(offset, offset + MEDIA_BATCH_SIZE);
+  let offset = 0;
+  while (offset < changes.length) {
+    const batch = nextMediaUploadBatch(changes, offset);
     progress(`Uploading media ${Math.min(offset + batch.length, changes.length)} of ${changes.length}…`);
     const response = await ankiRequest("msync", "uploadChanges", hostKey, mediaUploadZip(batch), true);
     const [accepted] = parseMediaResult<[number, number]>(response);
     if (Number(accepted) !== batch.length) throw new Error("AnkiWeb did not accept the complete media batch");
-    processed += batch.length;
+    offset += batch.length;
   }
-  return processed;
 }
 
 function mediaDownloadFiles(zipBytes: Uint8Array) {
@@ -161,13 +173,23 @@ function mediaDownloadFiles(zipBytes: Uint8Array) {
 async function downloadAllMedia(hostKey: string, progress: (message: string) => void) {
   progress("Reading AnkiWeb media index…");
   const remote = await remoteMediaState(hostKey);
-  const names = [...remote.entries()].filter(([, value]) => value.sha1).map(([name]) => name).sort();
+  let remaining = [...remote.entries()].filter(([, value]) => value.sha1).map(([name]) => name).sort();
+  const total = remaining.length;
   const files: MediaFile[] = [];
-  for (let offset = 0; offset < names.length; offset += MEDIA_BATCH_SIZE) {
-    const batch = names.slice(offset, offset + MEDIA_BATCH_SIZE);
-    progress(`Downloading media ${Math.min(offset + batch.length, names.length)} of ${names.length}…`);
-    const response = await ankiRequest("msync", "downloadFiles", hostKey, jsonBytes({ files: batch }), true);
-    files.push(...mediaDownloadFiles(response));
+
+  while (remaining.length) {
+    const requested = remaining.slice(0, MEDIA_BATCH_SIZE);
+    progress(`Downloading media ${files.length} of ${total}…`);
+    const response = await ankiRequest("msync", "downloadFiles", hostKey, jsonBytes({ files: requested }), true);
+    const downloaded = mediaDownloadFiles(response);
+    if (!downloaded.length) throw new Error("AnkiWeb returned an empty media batch");
+    const requestedNames = new Set(requested);
+    const downloadedNames = new Set(downloaded.map((file) => file.name));
+    if (downloaded.some((file) => !requestedNames.has(file.name))) {
+      throw new Error("AnkiWeb returned unexpected media files");
+    }
+    files.push(...downloaded);
+    remaining = remaining.filter((name) => !downloadedNames.has(name));
   }
   return files;
 }
