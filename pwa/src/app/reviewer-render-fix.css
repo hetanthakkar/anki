@@ -1,0 +1,79 @@
+/* Chrome can fail to paint an iframe while it sits on the back face of a
+   preserve-3d transform. Keep the visual flip, but swap the two iframe faces
+   with opacity/z-index so the active iframe is always rendered normally. */
+
+.reviewer .study-card-flipper {
+  transform-style: flat !important;
+}
+
+.reviewer .study-card-face {
+  backface-visibility: visible !important;
+  -webkit-backface-visibility: visible !important;
+  transform: none !important;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.reviewer .study-card-front {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+.reviewer .study-card-back {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.reviewer .study-card-flipper--flipped {
+  transform: none !important;
+  animation: reviewer-safe-flip 360ms cubic-bezier(0.22, 0.7, 0.22, 1);
+}
+
+.reviewer .study-card-flipper--flipped .study-card-front {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.reviewer .study-card-flipper--flipped .study-card-back {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+.reviewer .study-card-frame {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+@keyframes reviewer-safe-flip {
+  0% {
+    transform: scaleX(1);
+  }
+  48% {
+    transform: scaleX(0.06);
+  }
+  52% {
+    transform: scaleX(0.06);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reviewer .study-card-flipper--flipped {
+    animation: none;
+  }
+}
