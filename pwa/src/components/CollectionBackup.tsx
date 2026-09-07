@@ -46,7 +46,7 @@ export function CollectionBackup({ persistent, onBusyChange }: {
 
   return (
     <>
-      <AnkiWebSync onBusyChange={onBusyChange} />
+      <AnkiWebSync persistent={persistent} onBusyChange={onBusyChange} />
       <section className="settings-list">
         <div className="panel backup-panel" aria-busy={busy}>
           <div>
