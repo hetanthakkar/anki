@@ -178,6 +178,57 @@ complexipy-diff:
 clean *args:
     ./tools/clean {{ args }}
 
+# Browser-only PWA development and verification
+pwa-dev:
+    npm --prefix pwa run dev
+
+pwa-check:
+    npm --prefix pwa run typecheck
+    npm --prefix pwa test
+
+pwa-build:
+    npm --prefix pwa run build
+
+# Serve the production PWA after pwa-build
+pwa-start port="3002":
+    npm --prefix pwa run start -- --hostname 127.0.0.1 --port {{port}}
+
+# Requires a fresh Chrome test profile with CDP enabled
+pwa-test-browse cdp_port="9241" url="http://127.0.0.1:3021/":
+    npm --prefix pwa run test:browse-browser -- {{cdp_port}} {{url}}
+
+# Requires a running production PWA and a fresh Chrome test profile with CDP enabled
+pwa-test-browser cdp_port="9230" url="http://127.0.0.1:3002/" format="legacy":
+    npm --prefix pwa run test:browser -- {{cdp_port}} {{url}} {{format}}
+
+# Same requirements as pwa-test-browser; verifies all six stock note types
+pwa-test-card-types cdp_port="9231" url="http://127.0.0.1:3002/":
+    npm --prefix pwa run test:card-types-browser -- {{cdp_port}} {{url}}
+
+# Same requirements as pwa-test-browser; downloads and validates a collection backup
+pwa-test-backup cdp_port="9233" url="http://127.0.0.1:3002/":
+    npm --prefix pwa run test:backup-browser -- {{cdp_port}} {{url}}
+
+# Same requirements as pwa-test-browser; verifies full collection restore and media controls
+pwa-test-restore cdp_port="9250" url="http://127.0.0.1:3002/":
+    npm --prefix pwa run test:restore-browser -- {{cdp_port}} {{url}}
+
+# Same requirements as pwa-test-browser; reviews a card and verifies local statistics
+pwa-test-stats cdp_port="9235" url="http://127.0.0.1:3015/":
+    npm --prefix pwa run test:stats-browser -- {{cdp_port}} {{url}}
+
+# Same requirements as pwa-test-browser; verifies deck option persistence and scheduling limits
+pwa-test-deck-options cdp_port="9236" url="http://127.0.0.1:3016/":
+    npm --prefix pwa run test:deck-options-browser -- {{cdp_port}} {{url}}
+
+# Same requirements as pwa-test-browser; verifies custom note-type and template management
+pwa-test-note-types cdp_port="9237" url="http://127.0.0.1:3017/":
+    npm --prefix pwa run test:notetype-browser -- {{cdp_port}} {{url}}
+
+# Same requirements as pwa-test-browser; verifies reviewer actions, dialogs, and shortcuts
+pwa-test-review-actions cdp_port="9244" url="http://127.0.0.1:3024/":
+    npm --prefix pwa run test:review-actions-browser -- {{cdp_port}} {{url}}
+
 # Helpers to get the right commands for the platform
 
 ninja := if os() == "windows" { "tools\\ninja" } else { "./ninja" }
