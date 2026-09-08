@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { LocalCollectionInfo } from "@/lib/db/types";
 import type { AppPreferences } from "@/lib/preferences";
@@ -41,6 +41,15 @@ function PreferenceToggle({ checked, className = "", description, label, onChang
 
 export function SettingsPanel({ info, preferences, onChange, onReset, onBusyChange, onManageNoteTypes, onCollectionRestored }: Props) {
   const [notice, setNotice] = useState("Changes save automatically on this device.");
+  const [showKeyboardSettings, setShowKeyboardSettings] = useState(true);
+
+  useEffect(() => {
+    const phoneOrTouchLayout = window.matchMedia("(max-width: 760px), (hover: none) and (pointer: coarse)");
+    const updateKeyboardVisibility = () => setShowKeyboardSettings(!phoneOrTouchLayout.matches);
+    updateKeyboardVisibility();
+    phoneOrTouchLayout.addEventListener("change", updateKeyboardVisibility);
+    return () => phoneOrTouchLayout.removeEventListener("change", updateKeyboardVisibility);
+  }, []);
 
   const update = (patch: Partial<AppPreferences>) => {
     onChange(patch);
@@ -98,23 +107,25 @@ export function SettingsPanel({ info, preferences, onChange, onReset, onBusyChan
         <PreferenceToggle label="Show next review times" checked={preferences.showAnswerTimes}
           description="Displays the interval beneath Again, Hard, Good, and Easy."
           onChange={(showAnswerTimes) => update({ showAnswerTimes })} />
-        <PreferenceToggle className="keyboard-preference" label="Keyboard shortcuts" checked={preferences.keyboardShortcuts}
-          description="Answer, edit, replay, flag, bury, suspend, and undo without leaving the keyboard."
-          onChange={(keyboardShortcuts) => update({ keyboardShortcuts })} />
-        <div className="shortcut-reference keyboard-shortcut-reference" aria-label="Review keyboard shortcuts">
-          <span><kbd>Space</kbd><small>Show / Good</small></span>
-          <span><kbd>1</kbd><small>Again</small></span>
-          <span><kbd>2</kbd><small>Hard</small></span>
-          <span><kbd>3</kbd><small>Good</small></span>
-          <span><kbd>4</kbd><small>Easy</small></span>
-          <span><kbd>E</kbd><small>Edit</small></span>
-          <span><kbd>R</kbd><small>Replay</small></span>
-          <span><kbd>M</kbd><small>Mark</small></span>
-          <span><kbd>Z</kbd><small>Undo</small></span>
-          <span><kbd>Ctrl 1–7</kbd><small>Flag</small></span>
-          <span><kbd>- / =</kbd><small>Bury card / note</small></span>
-          <span><kbd>@ / !</kbd><small>Suspend card / note</small></span>
-        </div>
+        {showKeyboardSettings && <>
+          <PreferenceToggle className="keyboard-preference" label="Keyboard shortcuts" checked={preferences.keyboardShortcuts}
+            description="Answer, edit, replay, flag, bury, suspend, and undo without leaving the keyboard."
+            onChange={(keyboardShortcuts) => update({ keyboardShortcuts })} />
+          <div className="shortcut-reference keyboard-shortcut-reference" aria-label="Review keyboard shortcuts">
+            <span><kbd>Space</kbd><small>Show / Good</small></span>
+            <span><kbd>1</kbd><small>Again</small></span>
+            <span><kbd>2</kbd><small>Hard</small></span>
+            <span><kbd>3</kbd><small>Good</small></span>
+            <span><kbd>4</kbd><small>Easy</small></span>
+            <span><kbd>E</kbd><small>Edit</small></span>
+            <span><kbd>R</kbd><small>Replay</small></span>
+            <span><kbd>M</kbd><small>Mark</small></span>
+            <span><kbd>Z</kbd><small>Undo</small></span>
+            <span><kbd>Ctrl 1–7</kbd><small>Flag</small></span>
+            <span><kbd>- / =</kbd><small>Bury card / note</small></span>
+            <span><kbd>@ / !</kbd><small>Suspend card / note</small></span>
+          </div>
+        </>}
         <div className="settings-subsection-heading"><h3>Audio</h3></div>
         <PreferenceToggle label="Play audio automatically" checked={preferences.autoPlayAudio}
           description="Starts front and answer audio when that side becomes visible."
