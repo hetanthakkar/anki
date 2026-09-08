@@ -20,7 +20,15 @@ function duration(timeMs: number) {
 }
 
 function dayLabel(date: string) {
-  return new Date(date + "T12:00:00").toLocaleDateString(undefined, { weekday: "narrow" });
+  return new Date(date + "T12:00:00").toLocaleDateString(locale(), { weekday: "narrow" });
+}
+
+function fullDayLabel(date: string) {
+  return new Date(date + "T12:00:00").toLocaleDateString(locale(), { weekday: "long", month: "short", day: "numeric" });
+}
+
+function locale() {
+  return typeof document === "undefined" ? undefined : document.documentElement.lang || undefined;
 }
 
 export function StatsDashboard({ decks }: { decks: DeckSummary[] }) {
@@ -45,6 +53,8 @@ export function StatsDashboard({ decks }: { decks: DeckSummary[] }) {
 
   const maxDaily = useMemo(() => state.status === "ready"
     ? Math.max(1, ...state.data.daily.map((day) => day.reviews)) : 1, [state]);
+  const maxForecast = useMemo(() => state.status === "ready"
+    ? Math.max(1, ...state.data.forecast.map((day) => day.due)) : 1, [state]);
 
   return (
     <section className="stats-dashboard">
@@ -99,9 +109,9 @@ export function StatsDashboard({ decks }: { decks: DeckSummary[] }) {
               <div><h2>Daily activity</h2><p>Reviews completed over the last 14 days</p></div>
               <strong>{state.data.last30Days.reviews}</strong>
             </div>
-            <div className="stats-chart" role="img" aria-label="Daily reviews for the last 14 days">
+            <div className="stats-chart" role="list" aria-label="Daily reviews for the last 14 days">
               {state.data.daily.map((day) => (
-                <div className="stats-chart-day" key={day.date}
+                <div className="stats-chart-day" key={day.date} role="listitem"
                   aria-label={day.date + ": " + day.reviews + " reviews, " + duration(day.timeMs)}>
                   <span className="stats-bar-value">{day.reviews || ""}</span>
                   <span className={day.reviews ? "stats-bar" : "stats-bar stats-bar-empty"}
@@ -140,6 +150,29 @@ export function StatsDashboard({ decks }: { decks: DeckSummary[] }) {
                 <div><dt>Review</dt><dd>{state.data.cards.review}</dd></div>
                 <div><dt>Suspended</dt><dd>{state.data.cards.suspended}</dd></div>
                 <div><dt>Buried</dt><dd>{state.data.cards.buried}</dd></div>
+              </dl>
+            </article>
+
+            <article className="panel stats-section">
+              <div className="stats-section-heading"><div><h2>Upcoming reviews</h2><p>Cards due over the next 7 days</p></div></div>
+              <div className="stats-chart stats-forecast" role="list" aria-label="Reviews due over the next 7 days">
+                {state.data.forecast.map((day) => (
+                  <div className="stats-chart-day" key={day.date} role="listitem" aria-label={`${fullDayLabel(day.date)}: ${day.due} cards due`}>
+                    <span className="stats-bar-value">{day.due || ""}</span>
+                    <span className={day.due ? "stats-bar stats-forecast-bar" : "stats-bar stats-bar-empty"}
+                      style={{ height: Math.max(day.due ? 8 : 3, day.due / maxForecast * 100) + "%" }} />
+                    <span className="stats-day-label">{dayLabel(day.date)}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="panel stats-section">
+              <div className="stats-section-heading"><div><h2>Memory maturity</h2><p>Review cards by interval length</p></div></div>
+              <dl className="stats-card-states">
+                <div><dt>Young reviews</dt><dd>{state.data.maturity.young}</dd></div>
+                <div><dt>Mature reviews</dt><dd>{state.data.maturity.mature}</dd></div>
+                <div><dt>Average interval</dt><dd>{state.data.maturity.averageIntervalDays === null ? "—" : `${state.data.maturity.averageIntervalDays} days`}</dd></div>
               </dl>
             </article>
           </div>

@@ -25,6 +25,7 @@ function command(method, params = {}) {
 async function evaluate(expression) {
   const reply = await command("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
   if (reply.exceptionDetails) throw new Error(JSON.stringify(reply.exceptionDetails));
+  await command("Runtime.evaluate", { expression: "new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))", awaitPromise: true });
   return reply.result?.value;
 }
 async function until(expression) {
@@ -42,10 +43,29 @@ async function click(label) {
 async function setValue(selector, value) {
   await evaluate(`(() => {
     const input = document.querySelector(${JSON.stringify(selector)});
+    if (input.isContentEditable) {
+      input.focus(); input.textContent = ${JSON.stringify(value)};
+      input.dispatchEvent(new InputEvent("input", { bubbles: true }));
+      return;
+    }
     const prototype = input instanceof HTMLSelectElement ? HTMLSelectElement.prototype
       : input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
     Object.getOwnPropertyDescriptor(prototype, "value").set.call(input, ${JSON.stringify(value)});
     input.dispatchEvent(new Event(input instanceof HTMLSelectElement ? "change" : "input", { bubbles: true }));
+  })()`);
+}
+async function selectText(id, text) {
+  await evaluate(`(() => {
+    const field = document.getElementById(${JSON.stringify(id)}); field.focus();
+    const walker = document.createTreeWalker(field, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const start = node.textContent.indexOf(${JSON.stringify(text)});
+      if (start < 0) continue;
+      const range = document.createRange(); range.setStart(node, start); range.setEnd(node, start + ${text.length});
+      const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range); return;
+    }
+    throw new Error("Selection text not found");
   })()`);
 }
 async function selectOption(selector, label) {
@@ -107,32 +127,33 @@ try {
   await until('document.querySelector(".deck-list")');
   await click("Browse");
   await until('document.querySelector("#browser-query")');
-  await setValue("#browser-query", "Move me");
-  await evaluate('document.querySelector(".browser-search").requestSubmit()');
-  await until('document.querySelectorAll(".browser-note-row").length === 1');
-  await evaluate('document.querySelector(".browser-note-row").click()');
+  await until('document.querySelector(".browser-welcome")');
+  await setValue("#browser-query", '"Move me"');
+  await evaluate('document.querySelector(".browser-search-bar").requestSubmit()');
+  await until('document.querySelectorAll(".browser-open-note").length === 1');
+  await evaluate('document.querySelector(".browser-open-note").click()');
   await until('document.querySelector("#browser-field-0")');
   await setValue("#browser-tags", "edited deck-management");
   await evaluate('document.querySelector(".browser-editor .form-panel").requestSubmit()');
   await until('document.body.innerText.includes("Note saved.")');
 
-  await setValue("#browser-query", "Move me");
-  await evaluate('document.querySelector(".browser-search").requestSubmit()');
-  await until('document.querySelectorAll(".browser-note-row").length === 1');
-  assert.match(await evaluate("document.body.innerText"), /deck-management/);
-  await evaluate('document.querySelector(".browser-note-row").click()');
+  await setValue("#browser-query", '"Move me"');
+  await evaluate('document.querySelector(".browser-search-bar").requestSubmit()');
+  await until('document.querySelectorAll(".browser-open-note").length === 1');
+
+  await evaluate('document.querySelector(".browser-open-note").click()');
   await until('document.querySelector(".browser-card-actions select")');
-  await selectOption(".browser-card-actions select", "Move destination");
+  await selectOption(".browser-card-actions select[aria-label^='Move']", "Move destination");
   await until('document.querySelector(".browser-card").textContent.includes("Move destination")');
 
   await click("Suspend");
-  await until('document.body.innerText.includes("Suspended")');
+  await until('document.body.innerText.includes("suspended")');
   await click("Resume");
-  await until('document.body.innerText.includes("New")');
+  await until('document.body.innerText.includes("new")');
   await click("Bury");
-  await until('document.body.innerText.includes("Buried")');
+  await until('document.body.innerText.includes("buried")');
   await click("Unbury");
-  await until('document.body.innerText.includes("New")');
+  await until('document.body.innerText.includes("new")');
 
   await click("Decks");
   await until('document.querySelector(".deck-list")');
@@ -149,14 +170,130 @@ try {
   await click("Browse");
   await until('document.querySelector("#browser-query")');
   await setValue("#browser-query", "Child delete me");
-  await evaluate('document.querySelector(".browser-search").requestSubmit()');
-  await until('document.querySelectorAll(".browser-note-row").length === 0');
+  await evaluate('document.querySelector(".browser-search-bar").requestSubmit()');
+  await until('document.querySelectorAll(".browser-open-note").length === 0');
   await setValue("#browser-query", "deck-management");
-  await evaluate('document.querySelector(".browser-search").requestSubmit()');
-  await until('document.querySelectorAll(".browser-note-row").length === 1');
+  await evaluate('document.querySelector(".browser-search-bar").requestSubmit()');
+  await until('document.querySelectorAll(".browser-open-note").length === 1');
   assert.match(await evaluate("document.body.innerText"), /Move destination/);
 
-  console.log(JSON.stringify({ tags: true, subdecks: true, rename: true, move: true, recursiveDelete: true, suspend: true, bury: true }));
+
+  await click("All cards");
+  await until('document.querySelector(".browser-table-scroll").getAttribute("aria-busy") === "false"');
+  await evaluate('document.querySelector(".browser-open-note").click()');
+  await until('document.querySelector("#browser-field-0")');
+  await selectOption("select[aria-label^='Flag']", "Red");
+  await until('document.querySelector("select[aria-label^=Flag]").value === "1"');
+  await click("‹ Results");
+  await click("Red");
+  await until('document.querySelector(".browser-table-scroll").getAttribute("aria-busy") === "false"');
+  assert.equal(await evaluate('document.querySelectorAll(".browser-open-note").length'), 1);
+  await click("Save search");
+  await setValue("#search-name", "Red cards");
+  await click("Save");
+  await until('document.querySelector(".saved-search-row")');
+  await click("No Flag");
+  await until('document.querySelector(".browser-table-scroll").getAttribute("aria-busy") === "false"');
+  assert.equal(await evaluate('document.querySelectorAll(".browser-open-note").length'), 0);
+  await click("Red cards");
+  await until('document.querySelector(".browser-table-scroll").getAttribute("aria-busy") === "false"');
+  assert.equal(await evaluate('document.querySelectorAll(".browser-open-note").length'), 1);
+  await setValue("#sidebar-filter", "Untagged");
+  assert.equal(await evaluate('[...document.querySelectorAll(".browser-sidebar button")].some((button) => button.textContent === "Untagged")'), true);
+  await setValue("#sidebar-filter", "");
+  await click("All cards");
+  await until('document.querySelector(".browser-table-scroll").getAttribute("aria-busy") === "false"');
+  for (const label of ["Due", "Deck", "Card Type", "Sort Field"]) {
+    await evaluate(`Array.from(document.querySelectorAll("th button")).find(button => button.textContent.startsWith(${JSON.stringify(label)})).click()`);
+    await until('document.querySelector(".browser-table-scroll").getAttribute("aria-busy") === "false"');
+    assert.equal(await evaluate('document.querySelectorAll(".browser-open-note").length'), 1);
+  }
+  await selectOption("#browser-mode", "Notes");
+  await until('document.querySelector(".browser-table-scroll").getAttribute("aria-busy") === "false"');
+  assert.equal(await evaluate('document.querySelectorAll(".browser-open-note").length'), 1);
+  await command("Page.reload");
+  await until('document.querySelector(".deck-list")');
+  await click("Browse");
+  await until('document.querySelector(".saved-search-row")');
+  await click("Red cards");
+  await until('document.querySelector(".browser-table-scroll").getAttribute("aria-busy") === "false"');
+  assert.equal(await evaluate('document.querySelectorAll(".browser-open-note").length'), 1);
+
+  await click("Decks");
+  await openDeck("Move destination");
+  await evaluate(`document.querySelector('button[aria-label="Add card"]').click()`);
+  await until('document.querySelector("#note-type")');
+  await selectOption("#note-type", "Basic (and reversed card)");
+  await setValue("#note-field-0", "Bonjour");
+  await setValue("#note-field-1", "Hello");
+  await evaluate('document.querySelector(".form-panel").requestSubmit()');
+  await until('document.querySelector(".deck-overview")');
+  await evaluate(`document.querySelector('button[aria-label="Back"]').click()`);
+  await click("Browse");
+  await click("Browse all cards");
+  await until('document.querySelectorAll(".browser-open-note").length === 3');
+  await selectOption("#browser-mode", "Notes");
+  await until('document.querySelectorAll(".browser-open-note").length === 2');
+  await selectOption("#browser-mode", "Cards");
+  await until('document.querySelectorAll(".browser-open-note").length === 3');
+  await click("Current Deck");
+  await until('document.querySelectorAll(".browser-open-note").length === 3');
+  await setValue("#browser-query", 'note:"Basic (and reversed card)" card:2');
+  await click("Search");
+  await until('document.querySelectorAll(".browser-open-note").length === 1');
+  await evaluate('document.querySelector(".browser-open-note").click()');
+  await until('document.querySelector("#browser-field-0")');
+  await evaluate(`(() => {
+    const field = document.querySelector("#browser-field-0"); field.focus();
+    const range = document.createRange(); range.selectNodeContents(field);
+    const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range);
+  })()`);
+  await evaluate('document.querySelector(".note-editor-toolbar button[aria-label=Bold]").click()');
+  assert(await evaluate('Boolean(document.querySelector("#browser-field-0 b, #browser-field-0 strong"))'));
+  await click("Save note");
+  await until('document.querySelectorAll(".browser-open-note").length === 1');
+  await evaluate('document.querySelector(".browser-open-note").click()');
+  await until('document.querySelector("#browser-field-0")');
+  assert(await evaluate('Boolean(document.querySelector("#browser-field-0 b, #browser-field-0 strong"))'));
+  await click("‹ Results");
+  await click("All cards");
+  await until('document.querySelectorAll(".browser-open-note").length === 3');
+
+  await click("Decks");
+  await openDeck("Move destination");
+  await evaluate(`document.querySelector('button[aria-label="Add card"]').click()`);
+  await until('document.querySelector("#note-type")');
+  await selectOption("#note-type", "Cloze");
+  await setValue("#note-field-0", "Paris is in France");
+  await selectText("note-field-0", "Paris");
+  await evaluate('document.querySelector(".cloze-button").click()');
+  assert.equal(await evaluate('document.querySelector("#note-field-0").textContent'), "{{c1::Paris}} is in France");
+  await evaluate('document.querySelector(".form-panel").requestSubmit()');
+  await until('document.querySelector(".deck-overview")');
+  await evaluate(`document.querySelector('button[aria-label="Back"]').click()`);
+  await click("Browse");
+  await until('document.querySelector("#browser-query")');
+  await setValue("#browser-query", "note:Cloze");
+  await click("Search");
+  await until('document.querySelectorAll(".browser-open-note").length === 1');
+  await evaluate('document.querySelector(".browser-open-note").click()');
+  await until('document.querySelector("#browser-field-0")');
+  await selectText("browser-field-0", "France");
+  await evaluate('document.querySelector(".cloze-button").click()');
+  assert.equal(await evaluate('document.querySelector("#browser-field-0").textContent'), "{{c1::Paris}} is in {{c2::France}}");
+  await click("Save note");
+  await until('document.querySelectorAll(".browser-open-note").length === 2');
+  await click("All cards");
+  await until('document.querySelectorAll(".browser-open-note").length === 5');
+  for (const width of [390, 320]) {
+    await command("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 1, mobile: true });
+    assert(await evaluate('document.documentElement.scrollWidth <= innerWidth'), `Overflow at ${width}px`);
+  }
+  await evaluate('document.querySelector(".browser-open-note").click()');
+  await until('document.querySelector("#browser-field-0")');
+  assert(await evaluate('document.documentElement.scrollWidth <= innerWidth'), "Editor overflows at 320px");
+  console.log(JSON.stringify({ tags: true, subdecks: true, rename: true, move: true, recursiveDelete: true,
+    suspend: true, bury: true, flags: true, savedSearches: true, sorting: true, notesMode: true, formatting: true, cloze: true, mobile: true }));
 } finally {
   socket.close();
 }

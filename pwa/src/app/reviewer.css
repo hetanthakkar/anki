@@ -9,34 +9,6 @@
   padding-bottom: max(40px, env(safe-area-inset-bottom));
 }
 
-.deck-overview {
-  gap: 20px;
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
-
-.deck-empty {
-  margin: 0;
-  color: var(--text-muted);
-  text-align: center;
-  font-size: 14px;
-}
-
-.deck-overview .count-grid {
-  margin-top: 0;
-  border-radius: 12px;
-  background: #f8fafc;
-  box-shadow: none;
-}
-
-.deck-overview .count-grid > div { padding: 20px 8px; gap: 6px; }
-.deck-overview .count-grid strong { font-size: 32px; font-weight: 650; }
-.deck-overview .count-grid span { font-weight: 500; }
-.deck-overview .study-button { width: min(100%, 320px); margin: 0 auto; }
-.deck-overview .deck-total { margin: -10px 0 0; font-size: 12px; line-height: 1.6; }
 
 .review-top-bar {
   align-items: center;
@@ -101,6 +73,102 @@
   color: var(--text);
   font-weight: 650;
 }
+
+.review-session-meta { display: flex; align-items: center; gap: 12px; }
+.review-answer-timer { min-width: 42px; color: var(--text); font: 650 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; }
+.review-notice { margin: -8px 0 0; padding: 10px 12px; border: 1px solid #f0cf78; border-radius: 10px; background: #fff8dc; color: #7a5711; font-size: 12px; }
+
+.review-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: -10px;
+}
+
+.review-toolbar button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 11px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.review-toolbar button:hover:not(:disabled),
+.review-toolbar button[aria-expanded="true"] {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.review-toolbar button:disabled { opacity: .42; cursor: not-allowed; }
+.review-toolbar button span { min-width: 14px; font-size: 15px; text-align: center; }
+
+.review-dialog-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  overflow-y: auto;
+  padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+  place-items: center;
+  background: rgba(15, 23, 42, .52);
+  backdrop-filter: blur(5px);
+  animation: review-dialog-backdrop-in 160ms ease-out;
+}
+
+.review-dialog {
+  width: min(100%, 620px);
+  max-height: min(860px, calc(100dvh - 48px));
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 28px 90px rgba(15, 23, 42, .26);
+  animation: review-dialog-in 190ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.review-dialog--more { width: min(100%, 680px); }
+.review-dialog > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid var(--border); }
+.review-dialog > header h2 { margin: 3px 0 0; font-size: 21px; }
+.review-dialog > header .eyebrow { margin: 0; }
+.review-dialog-close { width: 36px; height: 36px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--text-muted); font-size: 24px; line-height: 1; }
+.review-dialog-close:hover:not(:disabled) { background: var(--page-background); color: var(--text); }
+
+.review-edit-form, .review-due-form, .review-card-info, .review-more-actions { display: grid; gap: 16px; padding: 22px; }
+.review-edit-form > p { margin: -5px 0 2px; }
+.review-edit-form > label, .review-due-form > label { font-size: 13px; font-weight: 700; }
+.review-edit-form > input, .review-due-form > input { width: 100%; min-height: 43px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font: inherit; }
+.review-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+
+.review-more-actions section { display: grid; gap: 10px; }
+.review-more-actions h3 { margin: 0; color: var(--text-muted); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+.review-flags { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.review-flags button { display: flex; min-width: 0; align-items: center; gap: 7px; padding: 9px; border: 1px solid var(--border); border-radius: 9px; background: transparent; color: var(--text-muted); font: inherit; font-size: 11px; }
+.review-flags button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); color: var(--text); }
+.review-flags button > span { width: 10px; height: 10px; flex: 0 0 auto; border-radius: 50%; }
+.review-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.review-action-grid > button { display: flex; min-height: 49px; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 13px; border: 1px solid var(--border); border-radius: 10px; background: transparent; color: var(--text); text-align: left; }
+.review-action-grid > button:hover:not(:disabled), .review-flags button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.review-action-grid small { color: var(--text-muted); }
+.review-action-grid .review-danger-action { color: #c9352b; }
+
+.review-due-form p { margin: 0; color: var(--text-muted); line-height: 1.55; }
+.review-card-info dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; margin: 0; border: 1px solid var(--border); border-radius: 11px; background: var(--border); }
+.review-card-info dl > div { min-width: 0; padding: 11px 13px; background: var(--surface); }
+.review-card-info dt { color: var(--text-muted); font-size: 11px; font-weight: 650; text-transform: uppercase; }
+.review-card-info dd { overflow-wrap: anywhere; margin: 4px 0 0; font-size: 13px; }
+.review-card-info .review-info-wide { grid-column: 1 / -1; }
+
+@keyframes review-dialog-backdrop-in { from { opacity: 0; } }
+@keyframes review-dialog-in { from { opacity: 0; transform: translateY(10px) scale(.985); } }
 
 .reviewer .study-card {
   position: relative;
@@ -274,23 +342,91 @@
   padding: 60px 24px;
 }
 
+.congratulations-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+
 @media (max-height: 760px) and (min-width: 601px) {
   .reviewer .study-card { height: clamp(390px, 52dvh, 480px); }
 }
 
 @media (max-width: 600px) {
-  .deck-overview { padding: 20px 16px; gap: 20px; }
-  .deck-overview .count-grid strong { font-size: 28px; }
-  .deck-overview .count-grid > div { padding: 20px 6px; }
   .review-top-bar { margin-bottom: 20px; padding-bottom: 16px; }
   .review-top-bar .title-group { gap: 11px; }
   .review-top-bar .back-button { width: 40px; height: 40px; }
   .review-top-bar h1 { font-size: 25px; }
   .reviewer { gap: 14px; }
   .review-session-heading { font-size: 12px; }
+  .review-toolbar { justify-content: stretch; margin-top: -6px; }
+  .review-toolbar button { flex: 1; justify-content: center; padding-inline: 7px; }
+  .review-dialog-backdrop { align-items: end; padding: 12px 0 0; }
+  .review-dialog { max-height: calc(100dvh - 12px); border-right: 0; border-bottom: 0; border-left: 0; border-radius: 20px 20px 0 0; }
+  .review-dialog > header, .review-edit-form, .review-due-form, .review-card-info, .review-more-actions { padding: 18px; }
+  .review-flags { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .review-action-grid { grid-template-columns: 1fr; }
+  .review-card-info dl { grid-template-columns: 1fr; }
+  .review-card-info .review-info-wide { grid-column: auto; }
   .reviewer .study-card { height: clamp(380px, 56svh, 510px); }
   .study-card-heading { padding: 16px 18px; }
   .reviewer .answer-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .reviewer .answer-btn { min-height: 64px; }
   .reviewer .review-stats-panel { padding: 16px; }
 }
+
+/* Keep the study flow in the same soft-sheet visual system as the app shell. */
+.reviewer .study-card-face {
+  border-color: var(--border);
+  border-radius: 28px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.reviewer .study-card-frame {
+  background: var(--surface);
+}
+
+.study-card-heading,
+.reviewer .study-card-prompt,
+.study-card-face-footer {
+  border-color: var(--border);
+  background: #f8fdf9;
+}
+
+.study-card-heading > span:last-child {
+  color: var(--text-muted);
+}
+
+.reviewer .study-card-prompt {
+  color: var(--accent-strong);
+}
+
+.reviewer .study-card-prompt:hover {
+  background: var(--accent-soft);
+}
+
+.reviewer .review-stats-panel {
+  border-color: var(--border);
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--surface) 74%, var(--accent-soft));
+  box-shadow: var(--shadow);
+}
+
+.reviewer .review-stat-bar {
+  background: #dcefe0;
+}
+
+:root[data-theme="dark"] .study-card-heading,
+:root[data-theme="dark"] .reviewer .study-card-prompt,
+:root[data-theme="dark"] .study-card-face-footer {
+  background: #26232e;
+}
+
+:root[data-theme="dark"] .reviewer .review-stat-bar {
+  background: #38343f;
+}
+
+/* Deck overview is a launch control, not a full-height dashboard. Keep its
+   content compact so a small deck does not create an empty-looking page. */
+.app-shell:has(> .deck-overview) {
+  width: min(100%, 760px);
+}
+
+

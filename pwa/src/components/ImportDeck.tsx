@@ -5,7 +5,7 @@ import { useState } from "react";
 import { importApkg } from "@/lib/db/client";
 import type { ApkgImportResult } from "@/lib/db/types";
 
-const MAX_FILE_BYTES = 128 * 1024 * 1024;
+const MAX_FILE_BYTES = 500 * 1024 * 1024;
 
 export function ImportDeck({ persistent, onBusyChange, onImported, onDone }: {
   persistent: boolean;
@@ -30,7 +30,7 @@ export function ImportDeck({ persistent, onBusyChange, onImported, onDone }: {
     setProgress("Opening file…");
     try {
       if (!/\.apkg$/i.test(file.name)) throw new Error("Choose an Anki deck package (.apkg), not a collection backup (.colpkg).");
-      if (!file.size || file.size > MAX_FILE_BYTES) throw new Error("Choose a non-empty .apkg file no larger than 128 MiB.");
+      if (!file.size || file.size > MAX_FILE_BYTES) throw new Error("Choose a non-empty .apkg file no larger than 500 MiB.");
       const imported = await importApkg(await file.arrayBuffer(), keepScheduling, setProgress);
       setResult(imported);
       try { await onImported(); }
@@ -49,7 +49,7 @@ export function ImportDeck({ persistent, onBusyChange, onImported, onDone }: {
       <h2>Import an Anki deck</h2>
       <p className="muted">Choose an .apkg exported from Anki or downloaded from shared decks. Your file stays on this device.</p>
       {!persistent && <p className="form-error" role="alert">Storage is temporary in this browser. Imported cards and media will be lost when you close or reload the app.</p>}
-      <label htmlFor="apkg-file">Deck package (.apkg, up to 128 MiB)</label>
+      <label htmlFor="apkg-file">Deck package (.apkg, up to 500 MiB)</label>
       <input id="apkg-file" type="file" accept=".apkg" disabled={busy} onChange={(event) => {
         setFile(event.target.files?.[0] ?? null);
         setError(null);

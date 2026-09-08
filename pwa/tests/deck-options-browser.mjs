@@ -42,9 +42,11 @@ async function click(label) {
 }
 async function setValue(selector, value) {
   await evaluate("(() => { const input = document.querySelector(" + JSON.stringify(selector) + ");"
-    + " const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;"
+    + " if (input.isContentEditable) { input.focus(); input.textContent = " + JSON.stringify(value) + ";"
+    + " input.dispatchEvent(new InputEvent('input', { bubbles: true })); return; }"
+    + " const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : input instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;"
     + " Object.getOwnPropertyDescriptor(prototype, 'value').set.call(input, " + JSON.stringify(value) + ");"
-    + " input.dispatchEvent(new Event('input', { bubbles: true })); })()");
+    + " input.dispatchEvent(new Event(input instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true })); })()");
 }
 async function addCard(front, back) {
   await evaluate("document.querySelector('button[aria-label=\"Add card\"]').click()");
@@ -52,6 +54,16 @@ async function addCard(front, back) {
   await setValue("#note-field-0", front);
   await setValue("#note-field-1", back);
   await evaluate("document.querySelector('.form-panel').requestSubmit()");
+  await until("document.querySelector('.deck-overview')");
+}
+async function toggleOption(label) {
+  await evaluate("[...document.querySelectorAll('.deck-option-toggles label')].find((row) => row.querySelector('strong').textContent === "
+    + JSON.stringify(label) + ").click()");
+}
+async function openDeck(name) {
+  await until("[...document.querySelectorAll('.deck-row .deck-name')].some((label) => label.textContent.trim() === " + JSON.stringify(name) + ")");
+  await evaluate("[...document.querySelectorAll('.deck-row')].find((row) => row.querySelector('.deck-name').textContent.trim() === "
+    + JSON.stringify(name) + ").click()");
   await until("document.querySelector('.deck-overview')");
 }
 
@@ -69,12 +81,24 @@ try {
   await addCard("Options question two", "Options answer two");
   await until("document.body.innerText.includes('2 cards total')");
 
+  await click("Manage");
+  await until("document.querySelector('#subdeck-name')");
+  await setValue("#subdeck-name", "Child");
+  await click("Create subdeck");
+  await until("document.querySelector('.deck-overview')");
+  await evaluate("document.querySelector('button[aria-label=\"Back\"]').click()");
+  await until("document.querySelector('.deck-list')");
+  await openDeck("Options browser test");
+
   await click("Options");
   await until("document.querySelector('#new-cards-per-day')");
   assert.equal(await evaluate("document.querySelector('#new-cards-per-day').value"), "20");
   assert.equal(await evaluate("document.querySelector('#reviews-per-day').value"), "200");
   assert.equal(await evaluate("document.querySelector('#desired-retention').value"), "90");
   assert.equal(await evaluate("document.querySelector('#learning-steps').value"), "1 10");
+  assert.equal(await evaluate("document.querySelector('#new-gather-order').value"), "deck");
+  assert.equal(await evaluate("document.querySelector('#review-order').value"), "due");
+  assert.equal(await evaluate("document.querySelector('#leech-threshold').value"), "8");
 
   await setValue("#new-cards-per-day", "1");
   await setValue("#reviews-per-day", "25");
@@ -82,16 +106,64 @@ try {
   await setValue("#maximum-interval", "30");
   await setValue("#learning-steps", "2 20");
   await setValue("#relearning-steps", "15");
+  await setValue("#new-gather-order", "descending");
+  await setValue("#new-sort-order", "gather");
+  await setValue("#new-insert-order", "random");
+  await setValue("#new-review-order", "before");
+  await setValue("#interday-review-order", "after");
+  await setValue("#review-order", "intervalDescending");
+  await setValue("#minimum-lapse-interval", "3");
+  await setValue("#leech-threshold", "4");
+  await setValue("#leech-action", "suspend");
+  await setValue("#maximum-answer-seconds", "45");
+  await setValue("#question-seconds", "0.2");
+  await setValue("#question-time-action", "reminder");
+  await setValue("#answer-seconds", "0.2");
+  await setValue("#answer-time-action", "reminder");
+  await toggleOption("New cards ignore review limit");
+  await toggleOption("Limits start from top");
+  await toggleOption("Bury new siblings");
+  await toggleOption("Show on-screen timer");
   await click("Save options");
   await until("document.querySelector('.form-success')?.textContent.includes('saved')");
   assert.equal(await evaluate("document.querySelector('.options-badge').textContent.trim()"), "Custom");
 
+  await evaluate("window.prompt = () => 'Reusable preset'");
+  await click("Add");
+  await until("document.querySelector('.form-success')?.textContent.includes('Created')");
+  assert.equal(await evaluate("document.querySelector('.deck-options-intro h2').textContent"), "Reusable preset");
+  await evaluate("window.prompt = () => 'Renamed preset'");
+  await click("Rename");
+  await until("document.querySelector('.form-success')?.textContent.includes('renamed')");
+  assert.equal(await evaluate("document.querySelector('.deck-options-intro h2').textContent"), "Renamed preset");
+  await click("Apply to subdecks");
+  await until("document.querySelector('.form-success')?.textContent.includes('subdecks')");
+  await evaluate("(() => { const select = document.querySelector('#deck-preset'); const option = [...select.options].find((item) => item.textContent.startsWith('Options browser test options '));"
+    + " Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, option.value); select.dispatchEvent(new Event('change', { bubbles: true })); window.confirm = () => true; })()");
+  await click("Delete");
+  await until("document.querySelector('.form-success')?.textContent.includes('deleted')");
+
   await evaluate("document.querySelector('button[aria-label=\"Back\"]').click()");
   await until("document.querySelector('.deck-overview')");
+  await evaluate("document.querySelector('button[aria-label=\"Back\"]').click()");
+  await until("document.querySelector('.deck-list')");
+  await openDeck("↳ Child");
+  await click("Options");
+  await until("document.querySelector('.deck-options-intro h2')");
+  assert.equal(await evaluate("document.querySelector('.deck-options-intro h2').textContent"), "Renamed preset");
+  await evaluate("document.querySelector('button[aria-label=\"Back\"]').click()");
+  await until("document.querySelector('.deck-overview')");
+  await evaluate("document.querySelector('button[aria-label=\"Back\"]').click()");
+  await until("document.querySelector('.deck-list')");
+  await openDeck("Options browser test");
+
   assert.equal(await evaluate("document.querySelector('.count-grid > div:first-child strong').textContent"), "1");
 
   await click("Study now");
   await until("document.querySelector('.study-card-frame')");
+  assert.equal(await evaluate("document.querySelector('.study-card-frame').getAttribute('srcdoc').includes('Options question two')"), true);
+  assert.ok(await evaluate("document.querySelector('.review-answer-timer').textContent"));
+  await until("document.querySelector('.review-notice')?.textContent.includes('Auto advance reminder')");
   await evaluate("document.querySelector('.study-card-prompt').click()");
   await until("document.querySelector('.study-card--flipped')");
   await until("document.querySelector('.answer-btn-label')");
@@ -109,6 +181,23 @@ try {
   assert.equal(await evaluate("document.querySelector('#maximum-interval').value"), "30");
   assert.equal(await evaluate("document.querySelector('#learning-steps').value"), "2 20");
   assert.equal(await evaluate("document.querySelector('#relearning-steps').value"), "15");
+  assert.equal(await evaluate("document.querySelector('#new-gather-order').value"), "descending");
+  assert.equal(await evaluate("document.querySelector('#new-sort-order').value"), "gather");
+  assert.equal(await evaluate("document.querySelector('#new-insert-order').value"), "random");
+  assert.equal(await evaluate("document.querySelector('#new-review-order').value"), "before");
+  assert.equal(await evaluate("document.querySelector('#interday-review-order').value"), "after");
+  assert.equal(await evaluate("document.querySelector('#review-order').value"), "intervalDescending");
+  assert.equal(await evaluate("document.querySelector('#minimum-lapse-interval').value"), "3");
+  assert.equal(await evaluate("document.querySelector('#leech-threshold').value"), "4");
+  assert.equal(await evaluate("document.querySelector('#leech-action').value"), "suspend");
+  assert.equal(await evaluate("document.querySelector('#maximum-answer-seconds').value"), "45");
+  assert.equal(await evaluate("document.querySelector('#question-seconds').value"), "0.2");
+  assert.equal(await evaluate("document.querySelector('#question-time-action').value"), "reminder");
+  assert.equal(await evaluate("document.querySelector('#answer-seconds').value"), "0.2");
+  assert.equal(await evaluate("document.querySelector('#answer-time-action').value"), "reminder");
+  assert.equal(await evaluate("[...document.querySelectorAll('.deck-option-toggles label')].find((row) => row.querySelector('strong').textContent === 'New cards ignore review limit').querySelector('input').checked"), true);
+  assert.equal(await evaluate("[...document.querySelectorAll('.deck-option-toggles label')].find((row) => row.querySelector('strong').textContent === 'Limits start from top').querySelector('input').checked"), true);
+  assert.equal(await evaluate("[...document.querySelectorAll('.deck-option-toggles label')].find((row) => row.querySelector('strong').textContent === 'Bury new siblings').querySelector('input').checked"), true);
 
   await click("Restore defaults");
   await until("document.querySelector('.form-success')?.textContent.includes('restored')");
@@ -125,9 +214,16 @@ try {
     learningSteps: true,
     retention: true,
     maximumInterval: true,
+    displayOrder: true,
+    burying: true,
+    lapsesAndLeeches: true,
+    timer: true,
+    autoAdvance: true,
+    fsrsParameters: true,
+    presetManagement: true,
+    recursivePresetApplication: true,
     reset: true
   }));
 } finally {
   socket.close();
 }
-

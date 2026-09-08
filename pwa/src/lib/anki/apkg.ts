@@ -5,7 +5,7 @@ import { Decompress } from "fzstd";
 import { Proto } from "./protobuf";
 import type { AnkiNotetype } from "./template";
 
-export const MAX_APKG_BYTES = 128 * 1024 * 1024;
+export const MAX_APKG_BYTES = 500 * 1024 * 1024;
 const MAX_EXPANDED_BYTES = 512 * 1024 * 1024;
 const MAX_MEDIA_BYTES = 64 * 1024 * 1024;
 const MAX_FILES = 50_000;
@@ -172,7 +172,7 @@ function readDatabase(sqlite: Sqlite3Static, bytes: Uint8Array, keepScheduling: 
 }
 
 export function readApkg(sqlite: Sqlite3Static, bytes: Uint8Array, keepScheduling: boolean): PackageData {
-  if (!bytes.length || bytes.length > MAX_APKG_BYTES) throw new Error("Choose an .apkg file no larger than 128 MiB");
+  if (!bytes.length || bytes.length > MAX_APKG_BYTES) throw new Error("Choose an .apkg file no larger than 500 MiB");
   let expanded = 0;
   let count = 0;
   const names = new Set<string>();
@@ -189,7 +189,7 @@ export function readApkg(sqlite: Sqlite3Static, bytes: Uint8Array, keepSchedulin
   const stored = zip[databaseName];
   if (!stored || !zip.media) throw new Error("Invalid .apkg: the collection or media manifest is missing");
   const databaseBytes = version === 3 ? decompress(stored, MAX_APKG_BYTES) : stored;
-  if (databaseBytes.length > MAX_APKG_BYTES) throw new Error("The uncompressed collection exceeds 128 MiB");
+  if (databaseBytes.length > MAX_APKG_BYTES) throw new Error("The uncompressed collection exceeds 500 MiB");
   const manifest = version === 3 ? decompress(zip.media, 16 * 1024 * 1024) : zip.media;
   const entries = version === 3
     ? new Proto(manifest).messages(1).map((entry, index) => ({

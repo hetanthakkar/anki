@@ -50,6 +50,18 @@ test("type filter produces an external typed-answer prompt without leaking the a
   assert.match(rendered.answerHtml, /Paris &amp; Lyon/);
 });
 
+test("common template filters render readable hints and Japanese readings", () => {
+  const model: AnkiNotetype = {
+    id: 31, name: "Filtered", type: 0, css,
+    flds: [field("Word", 0), field("Hint", 1)],
+    tmpls: [{ name: "Card 1", ord: 0, qfmt: "{{furigana:Word}} {{hint:Hint}}", afmt: "{{kana:Word}} / {{kanji:Word}}" }]
+  };
+  const rendered = renderAnkiCard(model, ["漢字[かんじ]", "Meaning"], 0);
+  assert.match(rendered.questionHtml, /<ruby>漢字<rt>かんじ<\/rt><\/ruby>/);
+  assert.match(rendered.questionHtml, /<details class="hint">/);
+  assert.equal(rendered.answerHtml, "かんじ / 漢字");
+});
+
 test("image occlusion parses Anki rectangles and renders active/inactive masks", () => {
   const model: AnkiNotetype = {
     id: 4, name: "Image Occlusion", type: 1, originalStockKind: 6, css,

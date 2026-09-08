@@ -22,6 +22,9 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // This is the deployment freshness probe. Caching it would let an old
+  // service worker claim its own build is current and prevent self-healing.
+  if (url.pathname === "/version.json") return;
   // API responses are live and should never be served from the offline shell cache.
   if (url.pathname.startsWith("/api/")) return;
 

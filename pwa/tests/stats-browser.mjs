@@ -85,13 +85,15 @@ try {
   assert.equal(await evaluate("document.querySelector('.stats-chart-day:last-child .stats-bar-value').textContent"), "1");
   assert.equal(await evaluate("[...document.querySelectorAll('.stats-answer')].find((row) => row.firstElementChild.textContent === 'Good').querySelector('strong').textContent"), "1");
   assert.equal(await evaluate("[...document.querySelectorAll('.stats-card-states > div')].find((row) => row.querySelector('dt').textContent === 'Learning').querySelector('dd').textContent"), "1");
+  assert.ok(await evaluate("document.querySelectorAll('.stats-forecast .stats-chart-day').length === 7"));
+  assert.match(await evaluate("document.body.innerText"), /Memory maturity/);
 
   const deckValue = await evaluate("[...document.querySelector('#stats-deck').options].find((option) => option.textContent === 'Stats browser test').value");
   await setValue("#stats-deck", deckValue);
   await until("document.querySelector('.stats-scope')?.textContent === 'Stats browser test'");
   assert.match(await evaluate("document.body.innerText"), /1 answers/);
 
-  console.log(JSON.stringify({ today: true, retention: true, streak: true, answers: true, cardStates: true, deckFilter: true }));
+  console.log(JSON.stringify({ today: true, retention: true, streak: true, answers: true, cardStates: true, forecast: true, maturity: true, deckFilter: true }));
 } finally {
   socket.close();
 }

@@ -98,6 +98,14 @@ function renderConditionals(template: string, fields: Map<string, string>) {
   return output;
 }
 
+function rubyFilter(value: string, mode: "furigana" | "kana" | "kanji") {
+  return value.replace(/([^\[\]\s]+)\[([^\]]+)]/g, (_match, base: string, reading: string) => {
+    if (mode === "kana") return reading;
+    if (mode === "kanji") return base;
+    return `<ruby>${base}<rt>${reading}</rt></ruby>`;
+  });
+}
+
 function applyFilter(filter: string, value: string, context: RenderContext) {
   switch (filter.toLowerCase()) {
     case "text":
@@ -108,12 +116,22 @@ function applyFilter(filter: string, value: string, context: RenderContext) {
       return renderClozes(value, context.cardOrdinal, context.side, true);
     case "hint":
       return value.trim()
-        ? `<span class="hint" title="${stripHtml(value).trim()}">Show hint</span>`
+        ? `<details class="hint"><summary>Show hint</summary><span>${value}</span></details>`
         : "";
     case "type":
       return context.side === "question"
-        ? '<span class="type-answer-marker">Type the answer below</span>'
+        ? value.trim() ? '<span class="type-answer-marker">Type the answer below</span>' : ""
         : `<span class="type-answer-correct">${escapeHtml(stripHtml(value).trim())}</span>`;
+    case "furigana":
+      return rubyFilter(value, "furigana");
+    case "kana":
+      return rubyFilter(value, "kana");
+    case "kanji":
+      return rubyFilter(value, "kanji");
+    case "tts":
+      // The review iframe is intentionally sandboxed, so browser speech APIs are unavailable.
+      // Preserve the readable text instead of exposing an unsupported template marker.
+      return stripHtml(value);
     default:
       // Unknown add-on filters should not expose the raw template marker.
       return value;

@@ -6,50 +6,87 @@ import {
   addNote,
   answerCard,
   createDeck,
+  deleteNote,
   deleteDeck,
   getNextCard,
+  getStudyCard,
   initLocalCollection,
   listDecks,
   listNotetypes,
   renameDeck,
-  storeMedia
+  resetCard,
+  setCardDue,
+  setCardFlag,
+  setCardStatus,
+  setNoteMarked,
+  setNoteStatus,
+  storeMedia,
+  undoLastReview,
+  updateNote
 } from "@/lib/db/client";
 import type { DeckSummary, LocalCollectionInfo, NoteTypeSummary, ReviewRating, StudyCard } from "@/lib/db/types";
-import { CollectionBackup } from "./CollectionBackup";
+import { CardBrowser } from "./CardBrowser";
 import { DeckOptionsEditor } from "./DeckOptionsEditor";
 import { ImportDeck } from "./ImportDeck";
 import { NoteFieldEditor } from "./NoteFieldEditor";
+import { NoteTypeManager } from "./NoteTypeManager";
 import { nextClozeNumber } from "@/lib/note-editing";
 import { emptyImageOcclusionDraft, ImageOcclusionEditor } from "./ImageOcclusionEditor";
 import type { ImageOcclusionDraft } from "./ImageOcclusionEditor";
+import { SettingsPanel } from "./SettingsPanel";
 import { StatsDashboard } from "./StatsDashboard";
+import { useAppPreferences } from "./useAppPreferences";
+import { ReviewActions } from "./ReviewActions";
+import type { ReviewDialog, ReviewDismissAction } from "./ReviewActions";
 
 type LoadState =
   | { status: "loading" }
   | { status: "ready"; info: LocalCollectionInfo; decks: DeckSummary[]; notetypes: NoteTypeSummary[] }
   | { status: "error"; message: string };
 
-type Screen = "decks" | "stats" | "settings" | "deck" | "deck-options" | "create-deck" | "manage-deck" | "add-note" | "review" | "import";
+type Screen = "decks" | "browse" | "stats" | "settings" | "note-types" | "deck" | "deck-options" | "create-deck" | "manage-deck" | "add-note" | "review" | "import";
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-function cardDocument(content: string, cardCss: string) {
+type CardDocumentOptions = {
+  theme: "light" | "dark";
+  autoPlayAudio: boolean;
+  showAudioControls: boolean;
+};
+
+function configureCardAudio(content: string, options: CardDocumentOptions) {
+  return content.replace(/<audio\b([^>]*)>/gi, (_match, attributes: string) => {
+    const clean = attributes.replace(/\s(?:autoplay|controls)(?:=[^\s>]*)?/gi, "");
+    return "<audio" + clean
+      + (options.showAudioControls ? " controls" : "")
+      + (options.autoPlayAudio ? " autoplay" : "") + ">";
+  });
+}
+
+function cardDocument(content: string, cardCss: string, options: CardDocumentOptions) {
+  const dark = options.theme === "dark";
+  const pageBackground = dark ? "#1e1b26" : "#ffffff";
+  const cardText = dark ? "#f4f2f7" : "#1c2e23";
+  const mutedText = dark ? "#a7a2b0" : "#64748b";
+  const divider = dark ? "#38343f" : "#d8eadc";
+  const preparedContent = configureCardAudio(content, options);
+  const nightClass = dark ? " nightMode night_mode" : "";
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
     <style>
-      :root{color-scheme:light}html,body{margin:0;width:100%;min-height:100%;background:#fff}
+      :root{color-scheme:${options.theme}}html,body{margin:0;width:100%;min-height:100%;background:${pageBackground}}
       body.card{box-sizing:border-box;min-height:100vh;padding:28px 22px!important;display:flex!important;align-items:center!important;justify-content:center!important;
-      font-family:Arial,sans-serif;font-size:21px;line-height:1.45;text-align:center!important;color:#17191c!important;background:#fff!important;overflow-wrap:anywhere}
-      .anki-card-content{width:100%;max-width:100%;color:#17191c!important;text-align:center!important}
-      hr#answer{width:100%;margin:28px 0;border:0;border-top:1px solid #d8dce3}img,video{max-width:100%;height:auto}
-      .anki-audio{width:min(100%,360px);margin:14px auto}.hint{color:#1f6fd1;text-decoration:underline;cursor:help}
-      .type-answer-marker{display:inline-block;margin-top:16px;color:#667085;font-size:14px}.type-answer-correct{font-weight:700}
+      font-family:Arial,sans-serif;font-size:21px;line-height:1.45;text-align:center!important;color:${cardText}!important;background:${pageBackground}!important;overflow-wrap:anywhere}
+      .anki-card-content{width:100%;max-width:100%;color:${cardText}!important;text-align:center!important}
+      hr#answer{width:100%;margin:28px 0;border:0;border-top:1px solid ${divider}}img,video{max-width:100%;height:auto}
+      .anki-audio{width:min(100%,360px);margin:14px auto}.hint{color:#4d9ae9;text-decoration:underline;cursor:help}
+      .type-answer-marker{display:inline-block;margin-top:16px;color:${mutedText};font-size:14px}.type-answer-correct{font-weight:700}
       ${cardCss.replace(/<\/style/gi, "<\\/style")}
-      body.card{color:#17191c!important;background:#fff!important;text-align:center!important}
-      .anki-card-content{color:#17191c!important;text-align:center!important}
-      .anki-card-content .cloze{color:#2badd5!important}
-    </style></head><body class="card"><div class="anki-card-content">${content}</div></body></html>`;
+      body.card{color:${cardText}!important;background:${pageBackground}!important;text-align:center!important}
+      .anki-card-content{color:${cardText}!important;text-align:center!important}
+      .anki-card-content .cloze{color:${dark ? "#f585a0" : "#16a34a"}!important}
+    </style></head><body class="card${nightClass}"><div class="anki-card-content">${preparedContent}</div></body></html>`;
 }
 
 function occlusionNumber(value: number) {
@@ -76,10 +113,18 @@ function leafDeckName(name: string) {
   return name.split("::").at(-1) ?? name;
 }
 
+function reviewTimerLabel(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 export function LocalCollectionStatus() {
+  const { preferences, resolvedTheme, updatePreferences, resetPreferences } = useAppPreferences();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [screen, setScreen] = useState<Screen>("decks");
   const [selectedDeckId, setSelectedDeckId] = useState<number | null>(null);
+  const lastDeckId = useRef<number | null>(null);
+  useEffect(() => { if (selectedDeckId !== null) lastDeckId.current = selectedDeckId; }, [selectedDeckId]);
   const [deckName, setDeckName] = useState("");
   const [subdeckName, setSubdeckName] = useState("");
   const [noteTypeId, setNoteTypeId] = useState<number | null>(null);
@@ -91,9 +136,15 @@ export function LocalCollectionStatus() {
   const [sessionReviews, setSessionReviews] = useState(0);
   const [answerShown, setAnswerShown] = useState(false);
   const [typedAnswer, setTypedAnswer] = useState("");
+  const [reviewDialog, setReviewDialog] = useState<ReviewDialog>(null);
+  const [undoAvailable, setUndoAvailable] = useState(false);
+  const [audioReplayKey, setAudioReplayKey] = useState(0);
+  const [reviewElapsedSeconds, setReviewElapsedSeconds] = useState(0);
+  const [reviewNotice, setReviewNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const shownAt = useRef(Date.now());
+  const answerShownAt = useRef<number | null>(null);
 
   const refreshDecks = useCallback(async () => {
     const decks = await listDecks();
@@ -293,6 +344,10 @@ export function LocalCollectionStatus() {
       setSessionReviews(0);
       setAnswerShown(false);
       setTypedAnswer("");
+      setReviewDialog(null);
+      setUndoAvailable(false);
+      setReviewElapsedSeconds(0);
+      setReviewNotice(null);
       shownAt.current = Date.now();
       setScreen("review");
     } catch (error) {
@@ -307,13 +362,19 @@ export function LocalCollectionStatus() {
     setBusy(true);
     setActionError(null);
     try {
-      await answerCard(studyCard.id, rating, Date.now() - shownAt.current);
+      const outcome = await answerCard(studyCard.id, rating, Date.now() - shownAt.current);
+      setUndoAvailable(true);
+      setReviewNotice(outcome.leeched
+        ? outcome.suspended ? "Leech detected: the note was tagged and this card was suspended." : "Leech detected: the note was tagged."
+        : null);
       setSessionReviews((count) => count + 1);
       const next = await getNextCard(selectedDeckId);
       setStudyCard(next);
       setStudyComplete(next === null);
       setAnswerShown(false);
       setTypedAnswer("");
+      setReviewDialog(null);
+      setReviewElapsedSeconds(0);
       shownAt.current = Date.now();
       await refreshDecks();
     } catch (error) {
@@ -323,33 +384,225 @@ export function LocalCollectionStatus() {
     }
   };
 
+  const refreshCurrentStudyCard = async (cardId = studyCard?.id) => {
+    if (!cardId || !selectedDeckId) return null;
+    const card = await getStudyCard(cardId);
+    if (card) {
+      setStudyCard(card);
+      setStudyComplete(false);
+    } else {
+      const next = await getNextCard(selectedDeckId);
+      setStudyCard(next);
+      setStudyComplete(next === null);
+      setAnswerShown(false);
+      setTypedAnswer("");
+      setReviewElapsedSeconds(0);
+      shownAt.current = Date.now();
+    }
+    return card;
+  };
+
+  const runReviewChange = async (change: () => Promise<void>, keepCard: boolean) => {
+    if (!studyCard || !selectedDeckId || busy) return false;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await change();
+      setUndoAvailable(false);
+      setReviewNotice(null);
+      if (keepCard) {
+        await refreshCurrentStudyCard();
+      } else {
+        const next = await getNextCard(selectedDeckId);
+        setStudyCard(next);
+        setStudyComplete(next === null);
+        setAnswerShown(false);
+        setTypedAnswer("");
+        setReviewElapsedSeconds(0);
+        shownAt.current = Date.now();
+      }
+      await refreshDecks();
+      return true;
+    } catch (error) {
+      setActionError(errorMessage(error));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const editReviewNote = (fields: string[], tags: string[]) => studyCard
+    ? runReviewChange(() => updateNote(studyCard.noteId, fields, tags), true) : Promise.resolve(false);
+  const flagReviewCard = (flag: number) => studyCard
+    ? runReviewChange(() => setCardFlag(studyCard.id, flag), true) : Promise.resolve(false);
+  const markReviewNote = (marked: boolean) => studyCard
+    ? runReviewChange(() => setNoteMarked(studyCard.noteId, marked), true) : Promise.resolve(false);
+  const setReviewDue = (days: number) => studyCard
+    ? runReviewChange(() => setCardDue(studyCard.id, days), false) : Promise.resolve(false);
+  const dismissReviewCard = (action: ReviewDismissAction) => {
+    if (!studyCard) return Promise.resolve(false);
+    const cardId = studyCard.id;
+    const noteId = studyCard.noteId;
+    const change = action === "bury-card" ? () => setCardStatus(cardId, "buried")
+      : action === "bury-note" ? () => setNoteStatus(noteId, "buried")
+        : action === "suspend-card" ? () => setCardStatus(cardId, "suspended")
+          : action === "suspend-note" ? () => setNoteStatus(noteId, "suspended")
+            : action === "reset" ? () => resetCard(cardId)
+              : () => deleteNote(noteId);
+    return runReviewChange(change, false);
+  };
+
+  const undoReview = async () => {
+    if (busy || !undoAvailable) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      const cardId = await undoLastReview();
+      if (cardId === null) {
+        setUndoAvailable(false);
+        setActionError("There is no review to undo.");
+        return;
+      }
+      const card = await getStudyCard(cardId);
+      if (!card) throw new Error("The reviewed card is no longer available");
+      setStudyCard(card);
+      setStudyComplete(false);
+      setSessionReviews((count) => Math.max(0, count - 1));
+      setAnswerShown(false);
+      setTypedAnswer("");
+      setReviewDialog(null);
+      setUndoAvailable(false);
+      setReviewElapsedSeconds(0);
+      setReviewNotice(null);
+      shownAt.current = Date.now();
+      await refreshDecks();
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const replayCardAudio = () => setAudioReplayKey((key) => key + 1);
+
+  useEffect(() => {
+    answerShownAt.current = answerShown ? answerShownAt.current ?? Date.now() : null;
+  }, [answerShown]);
+
+  useEffect(() => {
+    if (screen !== "review" || studyComplete || !studyCard?.timer.show) return;
+    const update = () => setReviewElapsedSeconds(Math.floor(((answerShown && studyCard.timer.stopOnAnswer
+      ? answerShownAt.current ?? Date.now() : Date.now()) - shownAt.current) / 1000));
+    update();
+    if (answerShown && studyCard.timer.stopOnAnswer) return;
+    const timer = window.setInterval(update, 250);
+    return () => window.clearInterval(timer);
+  }, [answerShown, screen, studyCard, studyComplete]);
+
+  useEffect(() => {
+    if (screen !== "review" || studyComplete || !studyCard || busy || reviewDialog) return;
+    const seconds = answerShown ? studyCard.timer.secondsToShowAnswer : studyCard.timer.secondsToShowQuestion;
+    if (seconds <= 0) return;
+    const timer = window.setTimeout(() => {
+      if (!answerShown) {
+        if (studyCard.timer.questionTimeAction === "showAnswer") setAnswerShown(true);
+        else setReviewNotice("Auto advance reminder: reveal the answer when you are ready.");
+        return;
+      }
+      const action = studyCard.timer.answerTimeAction;
+      if (action === "reminder") setReviewNotice("Auto advance reminder: choose an answer to continue.");
+      else if (action === "bury") void dismissReviewCard("bury-card");
+      else void rateCard(action === "again" ? 1 : action === "hard" ? 2 : 3);
+    }, seconds * 1_000);
+    return () => window.clearTimeout(timer);
+  }, [answerShown, busy, reviewDialog, screen, studyCard, studyComplete]);
+
+  useEffect(() => {
+    if (screen !== "review" || !preferences.keyboardShortcuts || busy) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      const target = event.target;
+      if (reviewDialog) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setReviewDialog(null);
+        }
+        return;
+      }
+      const isEditing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
+        || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable);
+      if (isEditing) return;
+      const key = event.key;
+      const lowerKey = key.toLocaleLowerCase();
+      if (!event.metaKey && !event.ctrlKey && !event.altKey && lowerKey === "z" && undoAvailable) {
+        event.preventDefault();
+        void undoReview();
+        return;
+      }
+      if (!studyCard || studyComplete) return;
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && /^[0-7]$/.test(key)) {
+        event.preventDefault();
+        void flagReviewCard(Number(key));
+        return;
+      }
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (lowerKey === "e") { event.preventDefault(); setReviewDialog("edit"); return; }
+      if (lowerKey === "m" || key === "*") {
+        event.preventDefault();
+        void markReviewNote(!studyCard.tags.some((tag) => tag.toLocaleLowerCase() === "marked"));
+        return;
+      }
+      if (lowerKey === "r") { event.preventDefault(); replayCardAudio(); return; }
+      if (lowerKey === "d") { event.preventDefault(); setReviewDialog("due"); return; }
+      if (lowerKey === "i") { event.preventDefault(); setReviewDialog("info"); return; }
+      if (key === "-") { event.preventDefault(); void dismissReviewCard("bury-card"); return; }
+      if (key === "=") { event.preventDefault(); void dismissReviewCard("bury-note"); return; }
+      if (key === "@") { event.preventDefault(); void dismissReviewCard("suspend-card"); return; }
+      if (key === "!") { event.preventDefault(); void dismissReviewCard("suspend-note"); return; }
+      if (!answerShown) {
+        if ((key === " " || key === "Enter") && !(target instanceof HTMLButtonElement)) {
+          event.preventDefault();
+          setAnswerShown(true);
+        }
+        return;
+      }
+      if (target instanceof HTMLButtonElement && (key === " " || key === "Enter")) return;
+      const rating = key === "1" ? 1 : key === "2" ? 2 : key === "3" || key === " " || key === "Enter" ? 3 : key === "4" ? 4 : null;
+      if (rating === null) return;
+      event.preventDefault();
+      void rateCard(rating);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [answerShown, busy, preferences.keyboardShortcuts, reviewDialog, screen, studyCard, studyComplete, undoAvailable]);
+
   if (state.status === "loading") {
-    return <main className="app-shell"><div className="panel collection-loading" role="status"><span className="loading-indicator" aria-hidden="true" /><strong>Opening your collection</strong><span className="muted">Getting your decks ready…</span></div></main>;
+    return <><a className="skip-link" href="#main-content">Skip to content</a><main id="main-content" className="app-shell" tabIndex={-1}><div className="panel collection-loading" role="status"><span className="loading-indicator" aria-hidden="true" /><strong>Opening your collection</strong><span className="muted">Getting your decks ready…</span></div></main></>;
   }
 
   if (state.status === "error") {
     return (
-      <main className="app-shell">
+      <><a className="skip-link" href="#main-content">Skip to content</a><main id="main-content" className="app-shell" tabIndex={-1}>
         <div className="panel error-panel">
           <strong>Local collection failed to open</strong>
           <span>{state.message}</span>
         </div>
-      </main>
+      </main></>
     );
   }
 
-  const showBack = screen !== "decks" && screen !== "stats" && screen !== "settings";
-  const title = screen === "import" ? "Import"
-    : screen === "stats" ? "Stats" : screen === "settings" ? "Settings" : screen === "deck-options" ? "Deck options"
+  const showBack = screen !== "decks" && screen !== "browse" && screen !== "stats" && screen !== "settings";
+  const title = screen === "browse" ? "Browse" : screen === "import" ? "Import"
+    : screen === "stats" ? "Stats" : screen === "settings" ? "Settings" : screen === "note-types" ? "Note types" : screen === "deck-options" ? "Deck options"
       : screen === "decks" || screen === "create-deck" ? "Decks" : selectedDeck?.name ?? "Deck";
 
   return (
-    <main className="app-shell">
+    <><a className="skip-link" href="#main-content">Skip to content</a><main id="main-content" className="app-shell" tabIndex={-1}>
       <header className={screen === "review" ? "top-bar review-top-bar" : "top-bar"}>
         <div className="title-group">
           {showBack && (
             <button className="back-button" type="button" disabled={busy}
-              onClick={screen === "deck" || !selectedDeckId ? goToDecks : () => goToDeck(selectedDeckId)} aria-label="Back">
+              onClick={screen === "note-types" ? () => setScreen("settings") : screen === "deck" || !selectedDeckId ? goToDecks : () => goToDeck(selectedDeckId)} aria-label="Back">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="m15 18-6-6 6-6" />
               </svg>
@@ -388,11 +641,7 @@ export function LocalCollectionStatus() {
 
       {screen === "decks" && (
         <>
-          <div className="storage-banner">
-            <span className={state.info.persistent ? "status-dot good" : "status-dot warning"} />
-            <span>{state.info.persistent ? "Stored locally on this device" : "Temporary storage fallback"}</span>
-            <span className="storage-meta">{state.info.persistent ? "Ready for offline study" : "Export a backup to keep your cards safe"}</span>
-          </div>
+
           <section className="deck-list" aria-label="Decks">
             <div className="deck-list-heading" aria-hidden="true"><span>YOUR DECKS</span><span className="deck-counts"><span>New</span><span>Learning</span><span>Review</span></span></div>
             {state.decks.map((deck) => {
@@ -417,9 +666,24 @@ export function LocalCollectionStatus() {
       {screen === "import" && <ImportDeck persistent={state.info.persistent} onBusyChange={setBusy}
         onImported={refreshCollection} onDone={goToDecks} />}
 
+      {screen === "browse" && <CardBrowser decks={state.decks} currentDeckId={lastDeckId.current} onCollectionChanged={refreshCollection} />}
+
       {screen === "stats" && <StatsDashboard decks={state.decks} />}
 
-      {screen === "settings" && <CollectionBackup persistent={state.info.persistent} onBusyChange={setBusy} />}
+      {screen === "settings" && <SettingsPanel info={state.info} preferences={preferences}
+        onChange={updatePreferences} onReset={resetPreferences} onBusyChange={setBusy}
+        onManageNoteTypes={() => { setScreen("note-types"); setActionError(null); }}
+        onCollectionRestored={async () => {
+          setSelectedDeckId(null);
+          setStudyCard(null);
+          setStudyComplete(false);
+          setReviewDialog(null);
+          setUndoAvailable(false);
+          setActionError(null);
+          await refreshCollection();
+        }} />}
+
+      {screen === "note-types" && <NoteTypeManager onCollectionChanged={refreshCollection} />}
 
       {screen === "create-deck" && (
         <form className="panel form-panel" onSubmit={saveDeck}>
@@ -431,22 +695,24 @@ export function LocalCollectionStatus() {
       )}
 
       {screen === "manage-deck" && selectedDeck && (
-        <section className="settings-list">
-          <form className="panel form-panel" onSubmit={saveDeckRename}>
-            <div className="form-heading"><strong>Rename deck</strong><span>{selectedDeck.name}</span></div>
-            <label htmlFor="manage-deck-name">Name</label>
-            <input id="manage-deck-name" autoFocus value={deckName} onChange={(event) => setDeckName(event.target.value)} />
-            <button className="primary-button" type="submit" disabled={busy || !deckName.trim()}>{busy ? "Saving…" : "Save name"}</button>
-          </form>
-          <form className="panel form-panel" onSubmit={saveSubdeck}>
-            <div className="form-heading"><strong>Create subdeck</strong><span>Under {selectedDeck.name}</span></div>
-            <label htmlFor="subdeck-name">Subdeck name</label>
-            <input id="subdeck-name" value={subdeckName} onChange={(event) => setSubdeckName(event.target.value)} placeholder="e.g. Verbs" />
-            <button className="secondary-button" type="submit" disabled={busy || !subdeckName.trim()}>{busy ? "Creating…" : "Create subdeck"}</button>
-          </form>
+        <section className="deck-management">
+          <div className="deck-management-grid">
+            <form className="panel form-panel deck-management-card" onSubmit={saveDeckRename}>
+              <div className="form-heading"><strong>Rename deck</strong><span>{selectedDeck.name}</span></div>
+              <label htmlFor="manage-deck-name">Name</label>
+              <input id="manage-deck-name" autoFocus value={deckName} onChange={(event) => setDeckName(event.target.value)} />
+              <button className="primary-button" type="submit" disabled={busy || !deckName.trim()}>{busy ? "Saving…" : "Save name"}</button>
+            </form>
+            <form className="panel form-panel deck-management-card" onSubmit={saveSubdeck}>
+              <div className="form-heading"><strong>Create subdeck</strong><span>Under {selectedDeck.name}</span></div>
+              <label htmlFor="subdeck-name">Subdeck name</label>
+              <input id="subdeck-name" value={subdeckName} onChange={(event) => setSubdeckName(event.target.value)} placeholder="e.g. Verbs" />
+              <button className="secondary-button" type="submit" disabled={busy || !subdeckName.trim()}>{busy ? "Creating…" : "Create subdeck"}</button>
+            </form>
+          </div>
           {actionError && <p className="panel form-error" role="alert">{actionError}</p>}
           {selectedDeck.id !== 1 && (
-            <div className="panel form-panel">
+            <div className="panel form-panel deck-management-delete">
               <div className="form-heading"><strong>Delete deck</strong><span>{selectedDeck.totalCards} cards including subdecks</span></div>
               <p className="muted">Deleting a deck also deletes its subdecks and cards. Notes are removed only when no cards remain elsewhere.</p>
               <button className="danger-button" type="button" disabled={busy} onClick={() => void removeSelectedDeck()}>Delete deck</button>
@@ -459,19 +725,153 @@ export function LocalCollectionStatus() {
         <DeckOptionsEditor deck={selectedDeck} onChanged={async () => { await refreshDecks(); }} />
       )}
 
-      {screen === "deck" && selectedDeck && (
+      {screen === "deck" && selectedDeck && (() => {
+        const dueToday = selectedDeck.newCount + selectedDeck.learningCount + selectedDeck.reviewCount;
+        const masteredCount = Math.max(0, selectedDeck.totalCards - selectedDeck.newCount - selectedDeck.learningCount - selectedDeck.reviewCount);
+        const subdecks = state.decks.filter((d) => d.id !== selectedDeck.id && d.name.toLocaleLowerCase().startsWith(`${selectedDeck.name.toLocaleLowerCase()}::`) && d.name.split("::").length === selectedDeck.name.split("::").length + 1);
+        const total = selectedDeck.totalCards || 1;
+        const newPct = (selectedDeck.newCount / total) * 100;
+        const learnPct = (selectedDeck.learningCount / total) * 100;
+        const reviewPct = (selectedDeck.reviewCount / total) * 100;
+        const masteredPct = (masteredCount / total) * 100;
+        // SVG donut chart values (circumference = 2 * π * 54 ≈ 339.29)
+        const C = 339.29;
+        const seg1 = (newPct / 100) * C;
+        const seg2 = (learnPct / 100) * C;
+        const seg3 = (reviewPct / 100) * C;
+        const seg4 = (masteredPct / 100) * C;
+        return (
         <section className="deck-overview">
-          <div className="count-grid">
-            <div><strong className="new-count">{selectedDeck.newCount}</strong><span>New cards</span></div>
-            <div><strong className="learn-count">{selectedDeck.learningCount}</strong><span>Learning</span></div>
-            <div><strong className="review-count">{selectedDeck.reviewCount}</strong><span>To review</span></div>
+          {/* Hero: Card composition ring + study CTA */}
+          <div className="deck-hero">
+            <div className="deck-ring-container" aria-hidden="true">
+              <svg className="deck-ring" viewBox="0 0 120 120">
+                {selectedDeck.totalCards > 0 ? (<>
+                  <circle className="deck-ring-segment deck-ring-new" cx="60" cy="60" r="54"
+                    strokeDasharray={`${seg1} ${C - seg1}`} strokeDashoffset="0" />
+                  <circle className="deck-ring-segment deck-ring-learn" cx="60" cy="60" r="54"
+                    strokeDasharray={`${seg2} ${C - seg2}`} strokeDashoffset={`${-seg1}`} />
+                  <circle className="deck-ring-segment deck-ring-review" cx="60" cy="60" r="54"
+                    strokeDasharray={`${seg3} ${C - seg3}`} strokeDashoffset={`${-(seg1 + seg2)}`} />
+                  <circle className="deck-ring-segment deck-ring-mastered" cx="60" cy="60" r="54"
+                    strokeDasharray={`${seg4} ${C - seg4}`} strokeDashoffset={`${-(seg1 + seg2 + seg3)}`} />
+                </>) : (
+                  <circle className="deck-ring-empty" cx="60" cy="60" r="54" />
+                )}
+              </svg>
+              <div className="deck-ring-center">
+                <span className="deck-ring-number">{selectedDeck.totalCards}</span>
+                <span className="deck-ring-label">{selectedDeck.totalCards === 1 ? "card" : "cards"}</span>
+              </div>
+            </div>
+            <div className="deck-hero-cta">
+              {dueToday > 0 ? (
+                <p className="deck-due-summary"><strong>{dueToday}</strong> {dueToday === 1 ? "card" : "cards"} due today</p>
+              ) : selectedDeck.totalCards > 0 ? (
+                <p className="deck-due-summary deck-due-none">No cards due — you&apos;re all caught up! 🎉</p>
+              ) : null}
+              <button className="primary-button study-button" type="button" disabled={busy || selectedDeck.totalCards === 0} onClick={beginStudy}>{busy ? "Opening…" : "Study now"}</button>
+            </div>
           </div>
-          {selectedDeck.totalCards === 0 && <p className="deck-empty">Add a card to start studying.</p>}
+
+          {/* Queue breakdown cards */}
+          <div className="deck-queue-grid" aria-label={`${selectedDeck.newCount} new cards, ${selectedDeck.learningCount} learning cards, ${selectedDeck.reviewCount} cards to review`}>
+            <div className="deck-queue-card deck-queue-new">
+              <div className="deck-queue-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+              </div>
+              <div className="deck-queue-info">
+                <span className="deck-queue-count">{selectedDeck.newCount}</span>
+                <span className="deck-queue-label">New</span>
+              </div>
+            </div>
+            <div className="deck-queue-card deck-queue-learning">
+              <div className="deck-queue-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 3a7 7 0 1 1 0 14 7 7 0 0 1 0-14Z" stroke="currentColor" strokeWidth="1.6"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
+              <div className="deck-queue-info">
+                <span className="deck-queue-count">{selectedDeck.learningCount}</span>
+                <span className="deck-queue-label">Learning</span>
+              </div>
+            </div>
+            <div className="deck-queue-card deck-queue-review">
+              <div className="deck-queue-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M4 10.5l4 4 8-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
+              <div className="deck-queue-info">
+                <span className="deck-queue-count">{selectedDeck.reviewCount}</span>
+                <span className="deck-queue-label">Review</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card composition legend */}
+          {selectedDeck.totalCards > 0 && (
+            <div className="deck-composition">
+              <h3 className="deck-section-title">Card composition</h3>
+              <div className="deck-comp-bar" aria-hidden="true">
+                {newPct > 0 && <div className="deck-comp-seg deck-comp-new" style={{ width: `${Math.max(newPct, 2)}%` }} />}
+                {learnPct > 0 && <div className="deck-comp-seg deck-comp-learn" style={{ width: `${Math.max(learnPct, 2)}%` }} />}
+                {reviewPct > 0 && <div className="deck-comp-seg deck-comp-review" style={{ width: `${Math.max(reviewPct, 2)}%` }} />}
+                {masteredPct > 0 && <div className="deck-comp-seg deck-comp-mastered" style={{ width: `${Math.max(masteredPct, 2)}%` }} />}
+              </div>
+              <div className="deck-comp-legend">
+                <span><span className="deck-comp-dot deck-comp-new" />New · {selectedDeck.newCount}</span>
+                <span><span className="deck-comp-dot deck-comp-learn" />Learning · {selectedDeck.learningCount}</span>
+                <span><span className="deck-comp-dot deck-comp-review" />Review · {selectedDeck.reviewCount}</span>
+                <span><span className="deck-comp-dot deck-comp-mastered" />Mastered · {masteredCount}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Subdecks */}
+          {subdecks.length > 0 && (
+            <div className="deck-subdecks">
+              <h3 className="deck-section-title">Subdecks</h3>
+              <div className="deck-subdeck-list">
+                {subdecks.map((sub) => (
+                  <button className="deck-subdeck-row" key={sub.id} type="button" onClick={() => goToDeck(sub.id)}>
+                    <span className="deck-subdeck-name">{leafDeckName(sub.name)}</span>
+                    <span className="deck-subdeck-counts">
+                      <span className="new-count">{sub.newCount}</span>
+                      <span className="learn-count">{sub.learningCount}</span>
+                      <span className="review-count">{sub.reviewCount}</span>
+                    </span>
+                    <svg className="deck-subdeck-arrow" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7.5 5l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {selectedDeck.totalCards === 0 && (
+            <div className="deck-empty-state">
+              <div className="deck-empty-icon" aria-hidden="true">
+                <svg viewBox="0 0 48 48" fill="none"><rect x="6" y="10" width="36" height="28" rx="4" stroke="currentColor" strokeWidth="2"/><path d="M6 18h36" stroke="currentColor" strokeWidth="2"/><circle cx="16" cy="28" r="3" stroke="currentColor" strokeWidth="1.5"/><path d="M24 26h12M24 31h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              </div>
+              <h3>No cards yet</h3>
+              <p>Add your first card to start building this deck and begin studying.</p>
+              <button className="secondary-button" type="button" onClick={() => {
+                const initial = state.notetypes.find((notetype) => notetype.id === noteTypeId) ?? state.notetypes[0];
+                if (initial) {
+                  setNoteTypeId(initial.id);
+                  setNoteFields(initial.fields.map(() => ""));
+                }
+                setAttachments([]);
+                setImageOcclusion(emptyImageOcclusionDraft);
+                setScreen("add-note");
+                setActionError(null);
+              }}>
+                <span aria-hidden="true">+ </span>Add your first card
+              </button>
+            </div>
+          )}
+
           {actionError && <p className="form-error panel" role="alert">{actionError}</p>}
-          <button className="primary-button study-button" type="button" disabled={busy || selectedDeck.totalCards === 0} onClick={beginStudy}>{busy ? "Opening…" : "Study now"}</button>
-          <p className="deck-total">{selectedDeck.totalCards} {selectedDeck.totalCards === 1 ? "card" : "cards"} total, including subdecks</p>
         </section>
-      )}
+        );
+      })()}
 
       {screen === "add-note" && selectedDeck && selectedNotetype && (
         <form className="panel form-panel" onSubmit={saveNote}>
@@ -512,27 +912,48 @@ export function LocalCollectionStatus() {
               <span className="complete-mark">✓</span>
               <h2>You’re all caught up.</h2>
               <p className="muted">You have finished this deck for now.</p>
-              <button className="secondary-button" type="button" onClick={() => selectedDeckId && goToDeck(selectedDeckId)}>Back to deck</button>
+              {reviewNotice && <p className="review-notice" role="status">{reviewNotice}</p>}
+              <div className="congratulations-actions">
+                {undoAvailable && <button className="secondary-button" type="button" disabled={busy} aria-keyshortcuts="Z" onClick={() => void undoReview()}>Undo last review</button>}
+                <button className="secondary-button" type="button" onClick={() => selectedDeckId && goToDeck(selectedDeckId)}>Back to deck</button>
+              </div>
             </div>
           ) : studyCard ? (
             <>
-              <div className="review-session-heading"><span>{answerShown ? "Check your answer" : "Take a moment to recall"}</span><span role="status">{sessionReviews} {sessionReviews === 1 ? "review" : "reviews"} completed</span></div>
+              <div className="review-session-heading">
+                <span>{answerShown ? "Check your answer" : "Take a moment to recall"}</span>
+                <div className="review-session-meta">
+                  {studyCard.timer.show && <span className="review-answer-timer" role="timer"
+                    aria-label={`${reviewElapsedSeconds} seconds elapsed`}>{reviewTimerLabel(Math.min(reviewElapsedSeconds, studyCard.timer.maximumSeconds))}</span>}
+                  {preferences.showReviewProgress && <span role="status">{sessionReviews} {sessionReviews === 1 ? "review" : "reviews"} completed</span>}
+                </div>
+              </div>
+              <ReviewActions card={studyCard} busy={busy} dialog={reviewDialog} undoAvailable={undoAvailable}
+                onDialogChange={setReviewDialog} onEdit={editReviewNote} onFlag={flagReviewCard} onMark={markReviewNote}
+                onDismiss={dismissReviewCard} onSetDue={setReviewDue} onUndo={undoReview} onReplay={replayCardAudio} />
+              {reviewNotice && <p className="review-notice" role="status">{reviewNotice}</p>}
               <div className={`study-card${answerShown ? " study-card--flipped" : ""}`}>
                 <div className="study-card-flipper">
                   <article className="study-card-face study-card-front" aria-hidden={answerShown} inert={answerShown || undefined}>
                     <div className="study-card-heading"><span>QUESTION</span><span>{selectedDeck ? leafDeckName(selectedDeck.name) : "Flashcard"}</span></div>
-                    <iframe className="study-card-frame" sandbox="" title="Card question" tabIndex={answerShown ? -1 : 0}
-                      srcDoc={cardDocument(studyCard.questionHtml, studyCard.cardCss)} />
+                    <iframe key={`question-${studyCard.id}-${audioReplayKey}`} className="study-card-frame" sandbox="" title="Card question" tabIndex={answerShown ? -1 : 0}
+                      srcDoc={cardDocument(studyCard.questionHtml, studyCard.cardCss, {
+                        theme: resolvedTheme, autoPlayAudio: preferences.autoPlayAudio && !answerShown,
+                        showAudioControls: preferences.showAudioControls
+                      })} />
                     {!studyCard.typedAnswer ? (
-                      <button className="study-card-prompt" type="button" onClick={() => setAnswerShown(true)}>
+                      <button className="study-card-prompt" type="button" aria-keyshortcuts="Space Enter" onClick={() => setAnswerShown(true)}>
                         Show answer <span className="prompt-arrow" aria-hidden="true">→</span>
                       </button>
                     ) : <div className="study-card-face-footer">Type your answer below</div>}
                   </article>
                   <article className="study-card-face study-card-back" aria-hidden={!answerShown} inert={!answerShown || undefined}>
                     <div className="study-card-heading"><span>ANSWER</span><span>{selectedDeck ? leafDeckName(selectedDeck.name) : "Flashcard"}</span></div>
-                    <iframe className="study-card-frame" sandbox="" title="Card answer" tabIndex={answerShown ? 0 : -1}
-                      srcDoc={cardDocument(studyCard.answerHtml, studyCard.cardCss)} />
+                    <iframe key={`answer-${studyCard.id}-${audioReplayKey}`} className="study-card-frame" sandbox="" title="Card answer" tabIndex={answerShown ? 0 : -1}
+                      srcDoc={cardDocument(studyCard.answerHtml, studyCard.cardCss, {
+                        theme: resolvedTheme, autoPlayAudio: preferences.autoPlayAudio && answerShown,
+                        showAudioControls: preferences.showAudioControls
+                      })} />
                     <div className="study-card-face-footer">Choose how well you remembered</div>
                   </article>
                 </div>
@@ -543,7 +964,7 @@ export function LocalCollectionStatus() {
                     <span>Type your answer</span>
                     <input id="typed-answer" autoFocus autoComplete="off" value={typedAnswer}
                       onChange={(event) => setTypedAnswer(event.target.value)}
-                      onKeyDown={(event) => { if (event.key === "Enter") setAnswerShown(true); }} />
+                      onKeyDown={(event) => { if (preferences.keyboardShortcuts && event.key === "Enter") setAnswerShown(true); }} />
                   </label>
                   <button className="primary-button show-answer" type="button" onClick={() => setAnswerShown(true)}>Show answer</button>
                 </>
@@ -560,15 +981,15 @@ export function LocalCollectionStatus() {
                   {studyCard.answerOptions.map((option) => {
                     const labels = ["", "Again", "Hard", "Good", "Easy"];
                     return (
-                      <button className={`answer-btn answer-btn--${option.rating}`} type="button" key={option.rating} disabled={busy} onClick={() => void rateCard(option.rating)}>
+                      <button className={`answer-btn answer-btn--${option.rating}`} type="button" key={option.rating} aria-keyshortcuts={String(option.rating)} disabled={busy} onClick={() => void rateCard(option.rating)}>
                         <span className="answer-btn-label">{labels[option.rating]}</span>
-                        <span className="answer-btn-interval">{option.intervalLabel}</span>
+                        {preferences.showAnswerTimes && <span className="answer-btn-interval">{option.intervalLabel}</span>}
                       </button>
                     );
                   })}
                 </div>
               )}
-              {selectedDeck && (
+              {preferences.showReviewProgress && selectedDeck && (
                 <div className="review-stats-panel">
                   <div className="review-stat">
                     <span className="review-stat-label">Introduced</span>
@@ -592,15 +1013,17 @@ export function LocalCollectionStatus() {
         </section>
       )}
 
-      {(screen === "decks" || screen === "stats" || screen === "settings") && (
+      {(screen === "decks" || screen === "browse" || screen === "stats" || screen === "settings") && (
         <nav className="bottom-nav" aria-label="Primary navigation">
           <button className={`nav-item ${screen === "decks" ? "active" : ""}`} aria-current={screen === "decks" ? "page" : undefined} type="button" onClick={goToDecks}>Decks</button>
+          <button className={`nav-item ${screen === "browse" ? "active" : ""}`} aria-current={screen === "browse" ? "page" : undefined} type="button"
+            onClick={() => { setScreen("browse"); setActionError(null); }}>Browse</button>
           <button className={`nav-item ${screen === "stats" ? "active" : ""}`} aria-current={screen === "stats" ? "page" : undefined} type="button"
             onClick={() => { setScreen("stats"); setSelectedDeckId(null); setActionError(null); }}>Stats</button>
           <button className={`nav-item ${screen === "settings" ? "active" : ""}`} aria-current={screen === "settings" ? "page" : undefined} type="button"
             onClick={() => { setScreen("settings"); setSelectedDeckId(null); setActionError(null); }}>Settings</button>
         </nav>
       )}
-    </main>
+    </main></>
   );
 }
