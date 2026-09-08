@@ -129,7 +129,15 @@ export function CloudSyncPanel({ embedded = false, onBusyChange, onRestored }: P
   }, []);
 
   useEffect(() => {
-    const supabase = supabaseBrowserClient();
+    let supabase;
+    try {
+      supabase = supabaseBrowserClient();
+    } catch (configurationError) {
+      // Cloud sync is optional. A missing public Supabase configuration must
+      // leave the rest of Settings usable instead of crashing this view.
+      setError(message(configurationError));
+      return;
+    }
     let active = true;
     void supabase.auth.getSession().then(async ({ data, error: sessionError }) => {
       if (!active) return;

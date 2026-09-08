@@ -1,0 +1,8 @@
+# Local dependencies and Next.js build output are rebuilt by Vercel.
+**/node_modules
+**/.next
+**/.env*
+**/tsconfig.tsbuildinfo
+out
+.git
+*.log
