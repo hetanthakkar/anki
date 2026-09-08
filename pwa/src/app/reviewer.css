@@ -1,9 +1,4 @@
 /* Study screens share the application's palette and surfaces. */
-.app-shell:has(> .deck-overview) {
-  width: min(100%, 840px);
-  padding-bottom: max(40px, env(safe-area-inset-bottom));
-}
-
 .app-shell:has(> .reviewer) {
   width: min(100%, 920px);
   padding-bottom: max(40px, env(safe-area-inset-bottom));
@@ -416,17 +411,9 @@
 :root[data-theme="dark"] .study-card-heading,
 :root[data-theme="dark"] .reviewer .study-card-prompt,
 :root[data-theme="dark"] .study-card-face-footer {
-  background: #26232e;
+  background: #333333;
 }
 
 :root[data-theme="dark"] .reviewer .review-stat-bar {
-  background: #38343f;
+  background: #464646;
 }
-
-/* Deck overview is a launch control, not a full-height dashboard. Keep its
-   content compact so a small deck does not create an empty-looking page. */
-.app-shell:has(> .deck-overview) {
-  width: min(100%, 760px);
-}
-
-

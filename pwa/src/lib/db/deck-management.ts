@@ -9,8 +9,6 @@ export type DeckRecord = {
   [key: string]: unknown;
 };
 
-const DEFAULT_DECK_ID = 1;
-
 function nowSeconds() {
   return Math.floor(Date.now() / 1000);
 }
@@ -102,7 +100,6 @@ export function deleteDeck(database: Database, deckId: number): void {
   const decks = readDecks(database);
   const deck = decks[String(deckId)];
   if (!deck || deck.dyn !== 0) throw new Error("Deck not found");
-  if (deckId === DEFAULT_DECK_ID) throw new Error("The Default deck cannot be deleted");
 
   const deckIds = deckScopeIds(decks, deckId);
   const deckIdSet = new Set(deckIds);

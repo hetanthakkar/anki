@@ -48,23 +48,31 @@ async function setValue(selector, value) {
     + " Object.getOwnPropertyDescriptor(prototype, 'value').set.call(input, " + JSON.stringify(value) + ");"
     + " input.dispatchEvent(new Event(input instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true })); })()");
 }
-async function addCard(front, back) {
-  await evaluate("document.querySelector('button[aria-label=\"Add card\"]').click()");
+async function openDeckAction(name, action) {
+  await until("[...document.querySelectorAll('.deck-row .deck-name')].some((label) => label.textContent.trim() === " + JSON.stringify(name) + ")");
+  await evaluate("(() => { const row = [...document.querySelectorAll('.deck-row')].find((item) => item.querySelector('.deck-name').textContent.trim() === "
+    + JSON.stringify(name) + "); row.querySelector('.deck-row-actions summary').click(); })()");
+  await until("[...document.querySelectorAll('.deck-row-menu button')].some((button) => button.textContent.trim() === " + JSON.stringify(action) + ")");
+  await evaluate("[...document.querySelectorAll('.deck-row-menu button')].find((button) => button.textContent.trim() === "
+    + JSON.stringify(action) + ").click()");
+}
+async function addCard(deckName, front, back) {
+  await openDeckAction(deckName, "Add card");
   await until("document.querySelector('#note-field-0')");
   await setValue("#note-field-0", front);
   await setValue("#note-field-1", back);
   await evaluate("document.querySelector('.form-panel').requestSubmit()");
-  await until("document.querySelector('.deck-overview')");
+  await until("document.querySelector('.deck-list')");
 }
 async function toggleOption(label) {
   await evaluate("[...document.querySelectorAll('.deck-option-toggles label')].find((row) => row.querySelector('strong').textContent === "
     + JSON.stringify(label) + ").click()");
 }
-async function openDeck(name) {
+async function studyDeck(name) {
   await until("[...document.querySelectorAll('.deck-row .deck-name')].some((label) => label.textContent.trim() === " + JSON.stringify(name) + ")");
   await evaluate("[...document.querySelectorAll('.deck-row')].find((row) => row.querySelector('.deck-name').textContent.trim() === "
-    + JSON.stringify(name) + ").click()");
-  await until("document.querySelector('.deck-overview')");
+    + JSON.stringify(name) + ").querySelector('.deck-study-button').click()");
+  await until("document.querySelector('.study-card-frame') || document.querySelector('.congratulations')");
 }
 
 try {
@@ -76,21 +84,18 @@ try {
   await until("document.querySelector('#deck-name')");
   await setValue("#deck-name", "Options browser test");
   await evaluate("document.querySelector('.form-panel').requestSubmit()");
-  await until("document.querySelector('.deck-overview')");
-  await addCard("Options question one", "Options answer one");
-  await addCard("Options question two", "Options answer two");
-  await until("document.body.innerText.includes('2 cards total')");
+  await until("document.querySelector('.deck-list')");
+  await addCard("Options browser test", "Options question one", "Options answer one");
+  await addCard("Options browser test", "Options question two", "Options answer two");
+  await until("document.body.innerText.includes('Options browser test')");
 
-  await click("Manage");
+  await openDeckAction("Options browser test", "Manage");
   await until("document.querySelector('#subdeck-name')");
   await setValue("#subdeck-name", "Child");
   await click("Create subdeck");
-  await until("document.querySelector('.deck-overview')");
-  await evaluate("document.querySelector('button[aria-label=\"Back\"]').click()");
   await until("document.querySelector('.deck-list')");
-  await openDeck("Options browser test");
 
-  await click("Options");
+  await openDeckAction("Options browser test", "Options");
   await until("document.querySelector('#new-cards-per-day')");
   assert.equal(await evaluate("document.querySelector('#new-cards-per-day').value"), "20");
   assert.equal(await evaluate("document.querySelector('#reviews-per-day').value"), "200");
@@ -144,23 +149,14 @@ try {
   await until("document.querySelector('.form-success')?.textContent.includes('deleted')");
 
   await evaluate("document.querySelector('button[aria-label=\"Back\"]').click()");
-  await until("document.querySelector('.deck-overview')");
-  await evaluate("document.querySelector('button[aria-label=\"Back\"]').click()");
   await until("document.querySelector('.deck-list')");
-  await openDeck("↳ Child");
-  await click("Options");
+  await openDeckAction("↳ Child", "Options");
   await until("document.querySelector('.deck-options-intro h2')");
   assert.equal(await evaluate("document.querySelector('.deck-options-intro h2').textContent"), "Renamed preset");
   await evaluate("document.querySelector('button[aria-label=\"Back\"]').click()");
-  await until("document.querySelector('.deck-overview')");
-  await evaluate("document.querySelector('button[aria-label=\"Back\"]').click()");
   await until("document.querySelector('.deck-list')");
-  await openDeck("Options browser test");
 
-  assert.equal(await evaluate("document.querySelector('.count-grid > div:first-child strong').textContent"), "1");
-
-  await click("Study now");
-  await until("document.querySelector('.study-card-frame')");
+  await studyDeck("Options browser test");
   assert.equal(await evaluate("document.querySelector('.study-card-frame').getAttribute('srcdoc').includes('Options question two')"), true);
   assert.ok(await evaluate("document.querySelector('.review-answer-timer').textContent"));
   await until("document.querySelector('.review-notice')?.textContent.includes('Auto advance reminder')");
@@ -171,9 +167,9 @@ try {
   await evaluate("[...document.querySelectorAll('.answer-btn')].find((button) => button.querySelector('.answer-btn-label').textContent === 'Good').click()");
   await until("document.body.innerText.includes('all caught up')");
 
-  await click("Back to deck");
-  await until("document.querySelector('.deck-overview')");
-  await click("Options");
+  await click("Back to decks");
+  await until("document.querySelector('.deck-list')");
+  await openDeckAction("Options browser test", "Options");
   await until("document.querySelector('#new-cards-per-day')");
   assert.equal(await evaluate("document.querySelector('#new-cards-per-day').value"), "1");
   assert.equal(await evaluate("document.querySelector('#reviews-per-day').value"), "25");
@@ -205,8 +201,8 @@ try {
   assert.equal(await evaluate("document.querySelector('#new-cards-per-day').value"), "20");
 
   await evaluate("document.querySelector('button[aria-label=\"Back\"]').click()");
-  await until("document.querySelector('.deck-overview')");
-  assert.equal(await evaluate("document.querySelector('.count-grid > div:first-child strong').textContent"), "1");
+  await until("document.querySelector('.deck-list')");
+  assert.equal(await evaluate("[...document.querySelectorAll('.deck-row')].some((row) => row.textContent.includes('Options browser test'))"), true);
 
   console.log(JSON.stringify({
     persisted: true,

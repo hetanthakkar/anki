@@ -44,7 +44,7 @@ type LoadState =
   | { status: "ready"; info: LocalCollectionInfo; decks: DeckSummary[]; notetypes: NoteTypeSummary[] }
   | { status: "error"; message: string };
 
-type Screen = "decks" | "browse" | "stats" | "settings" | "note-types" | "deck" | "deck-options" | "create-deck" | "manage-deck" | "add-note" | "review" | "import";
+type Screen = "decks" | "browse" | "stats" | "settings" | "note-types" | "deck-options" | "create-deck" | "manage-deck" | "add-note" | "review" | "import";
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -67,10 +67,10 @@ function configureCardAudio(content: string, options: CardDocumentOptions) {
 
 function cardDocument(content: string, cardCss: string, options: CardDocumentOptions) {
   const dark = options.theme === "dark";
-  const pageBackground = dark ? "#1e1b26" : "#ffffff";
-  const cardText = dark ? "#f4f2f7" : "#1c2e23";
-  const mutedText = dark ? "#a7a2b0" : "#64748b";
-  const divider = dark ? "#38343f" : "#d8eadc";
+  const pageBackground = dark ? "#2e2e2e" : "#ffffff";
+  const cardText = dark ? "#f2f2f2" : "#1c2e23";
+  const mutedText = dark ? "#b3b3b3" : "#64748b";
+  const divider = dark ? "#464646" : "#d8eadc";
   const preparedContent = configureCardAudio(content, options);
   const nightClass = dark ? " nightMode night_mode" : "";
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -194,18 +194,30 @@ export function LocalCollectionStatus() {
     setActionError(null);
   };
 
-  const goToDeck = (deckId: number) => {
-    setSelectedDeckId(deckId);
-    setScreen("deck");
-    setActionError(null);
-  };
-
-  const openDeckManagement = () => {
-    if (!selectedDeck) return;
-    setDeckName(leafDeckName(selectedDeck.name));
+  const openDeckManagement = (deck: DeckSummary) => {
+    setSelectedDeckId(deck.id);
+    setDeckName(leafDeckName(deck.name));
     setSubdeckName("");
     setActionError(null);
     setScreen("manage-deck");
+  };
+
+  const openDeckOptions = (deck: DeckSummary) => {
+    setSelectedDeckId(deck.id);
+    setActionError(null);
+    setScreen("deck-options");
+  };
+
+  const openAddCard = (deck: DeckSummary) => {
+    const initial = state.status === "ready" ? state.notetypes.find((notetype) => notetype.id === noteTypeId) ?? state.notetypes[0] : null;
+    if (!initial) return;
+    setSelectedDeckId(deck.id);
+    setNoteTypeId(initial.id);
+    setNoteFields(initial.fields.map(() => ""));
+    setAttachments([]);
+    setImageOcclusion(emptyImageOcclusionDraft);
+    setActionError(null);
+    setScreen("add-note");
   };
 
   const saveDeck = async (event: React.FormEvent) => {
@@ -213,10 +225,10 @@ export function LocalCollectionStatus() {
     setBusy(true);
     setActionError(null);
     try {
-      const deck = await createDeck(deckName);
+      await createDeck(deckName);
       await refreshDecks();
       setDeckName("");
-      goToDeck(deck.id);
+      goToDecks();
     } catch (error) {
       setActionError(errorMessage(error));
     } finally {
@@ -239,7 +251,7 @@ export function LocalCollectionStatus() {
     try {
       await renameDeck(selectedDeck.id, fullName);
       await refreshDecks();
-      setScreen("deck");
+      goToDecks();
     } catch (error) {
       setActionError(errorMessage(error));
     } finally {
@@ -259,10 +271,10 @@ export function LocalCollectionStatus() {
     setBusy(true);
     setActionError(null);
     try {
-      const deck = await createDeck(`${selectedDeck.name}::${child}`);
+      await createDeck(`${selectedDeck.name}::${child}`);
       await refreshDecks();
       setSubdeckName("");
-      goToDeck(deck.id);
+      goToDecks();
     } catch (error) {
       setActionError(errorMessage(error));
     } finally {
@@ -271,7 +283,7 @@ export function LocalCollectionStatus() {
   };
 
   const removeSelectedDeck = async () => {
-    if (state.status !== "ready" || !selectedDeck || selectedDeck.id === 1 || busy) return;
+    if (state.status !== "ready" || !selectedDeck || busy) return;
     const hasChildren = state.decks.some((deck) => deck.id !== selectedDeck.id && deck.name.toLocaleLowerCase().startsWith(`${selectedDeck.name.toLocaleLowerCase()}::`));
     const scope = hasChildren ? "this deck, its subdecks, and their cards" : "this deck and its cards";
     if (!window.confirm(`Delete ${scope}? Notes that have no cards left will also be deleted. This cannot be undone.`)) return;
@@ -308,7 +320,7 @@ export function LocalCollectionStatus() {
         await addNote(selectedDeckId, selectedNotetype.id, imageOcclusionFields(selectedNotetype, imageOcclusion, filename));
         await refreshDecks();
         setImageOcclusion(emptyImageOcclusionDraft);
-        setScreen("deck");
+        goToDecks();
         return;
       }
       const mediaMarkup: string[] = [];
@@ -325,7 +337,7 @@ export function LocalCollectionStatus() {
       await refreshDecks();
       setNoteFields(selectedNotetype.fields.map(() => ""));
       setAttachments([]);
-      setScreen("deck");
+      goToDecks();
     } catch (error) {
       setActionError(errorMessage(error));
     } finally {
@@ -333,12 +345,13 @@ export function LocalCollectionStatus() {
     }
   };
 
-  const beginStudy = async () => {
-    if (!selectedDeckId) return;
+  const beginStudy = async (deckId = selectedDeckId) => {
+    if (!deckId) return;
     setBusy(true);
     setActionError(null);
     try {
-      const card = await getNextCard(selectedDeckId);
+      setSelectedDeckId(deckId);
+      const card = await getNextCard(deckId);
       setStudyCard(card);
       setStudyComplete(card === null);
       setSessionReviews(0);
@@ -594,7 +607,7 @@ export function LocalCollectionStatus() {
   const showBack = screen !== "decks" && screen !== "browse" && screen !== "stats" && screen !== "settings";
   const title = screen === "browse" ? "Browse" : screen === "import" ? "Import"
     : screen === "stats" ? "Stats" : screen === "settings" ? "Settings" : screen === "note-types" ? "Note types" : screen === "deck-options" ? "Deck options"
-      : screen === "decks" || screen === "create-deck" ? "Decks" : selectedDeck?.name ?? "Deck";
+      : "Decks";
 
   return (
     <><a className="skip-link" href="#main-content">Skip to content</a><main id="main-content" className="app-shell" tabIndex={-1}>
@@ -602,7 +615,7 @@ export function LocalCollectionStatus() {
         <div className="title-group">
           {showBack && (
             <button className="back-button" type="button" disabled={busy}
-              onClick={screen === "note-types" ? () => setScreen("settings") : screen === "deck" || !selectedDeckId ? goToDecks : () => goToDeck(selectedDeckId)} aria-label="Back">
+              onClick={screen === "note-types" ? () => setScreen("settings") : goToDecks} aria-label="Back">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="m15 18-6-6 6-6" />
               </svg>
@@ -619,24 +632,6 @@ export function LocalCollectionStatus() {
             <button className="primary-button create-deck-button" type="button" onClick={() => { setDeckName(""); setScreen("create-deck"); setActionError(null); }} aria-label="Add deck"><span aria-hidden="true">+</span> Create deck</button>
           </div>
         )}
-        {screen === "deck" && (
-          <div className="top-actions">
-            <button className="secondary-button" type="button" disabled={busy}
-              onClick={() => { setScreen("deck-options"); setActionError(null); }}>Options</button>
-            <button className="secondary-button" type="button" disabled={busy} onClick={openDeckManagement}>Manage</button>
-            <button className="icon-button" type="button" onClick={() => {
-              const initial = state.notetypes.find((notetype) => notetype.id === noteTypeId) ?? state.notetypes[0];
-              if (initial) {
-                setNoteTypeId(initial.id);
-                setNoteFields(initial.fields.map(() => ""));
-              }
-              setAttachments([]);
-              setImageOcclusion(emptyImageOcclusionDraft);
-              setScreen("add-note");
-              setActionError(null);
-            }} aria-label="Add card">+</button>
-          </div>
-        )}
       </header>
 
       {screen === "decks" && (
@@ -647,16 +642,27 @@ export function LocalCollectionStatus() {
             {state.decks.map((deck) => {
               const depth = Math.max(0, deck.name.split("::").length - 1);
               return (
-                <button className="deck-row" key={deck.id} type="button" onClick={() => goToDeck(deck.id)}>
-                  <span className="deck-name" style={{ paddingInlineStart: `${depth * 18}px` }}>
-                    {depth > 0 ? "↳ " : ""}{leafDeckName(deck.name)}
-                  </span>
-                  <span className="deck-counts" aria-label={`${deck.newCount} new, ${deck.learningCount} learning, ${deck.reviewCount} to review; ${deck.totalCards} cards total`}>
-                    <span className="new-count">{deck.newCount}</span>
-                    <span className="learn-count">{deck.learningCount}</span>
-                    <span className="review-count">{deck.reviewCount}</span>
-                  </span>
-                </button>
+                <div className="deck-row" data-deck-id={deck.id} key={deck.id}>
+                  <button className="deck-study-button" type="button" disabled={busy || deck.totalCards === 0}
+                    onClick={() => void beginStudy(deck.id)} aria-label={`Study ${deck.name}`}>
+                    <span className="deck-name" style={{ paddingInlineStart: `${depth * 18}px` }}>
+                      {depth > 0 ? "↳ " : ""}{leafDeckName(deck.name)}
+                    </span>
+                    <span className="deck-counts" aria-label={`${deck.newCount} new, ${deck.learningCount} learning, ${deck.reviewCount} to review; ${deck.totalCards} cards total`}>
+                      <span className="new-count">{deck.newCount}</span>
+                      <span className="learn-count">{deck.learningCount}</span>
+                      <span className="review-count">{deck.reviewCount}</span>
+                    </span>
+                  </button>
+                  <details className="deck-row-actions">
+                    <summary aria-label={`Actions for ${deck.name}`}>Actions</summary>
+                    <div className="deck-row-menu">
+                      <button type="button" aria-label={`Add card to ${deck.name}`} onClick={() => openAddCard(deck)}>Add card</button>
+                      <button type="button" onClick={() => openDeckOptions(deck)}>Options</button>
+                      <button type="button" onClick={() => openDeckManagement(deck)}>Manage</button>
+                    </div>
+                  </details>
+                </div>
               );
             })}
           </section>
@@ -711,167 +717,17 @@ export function LocalCollectionStatus() {
             </form>
           </div>
           {actionError && <p className="panel form-error" role="alert">{actionError}</p>}
-          {selectedDeck.id !== 1 && (
-            <div className="panel form-panel deck-management-delete">
-              <div className="form-heading"><strong>Delete deck</strong><span>{selectedDeck.totalCards} cards including subdecks</span></div>
-              <p className="muted">Deleting a deck also deletes its subdecks and cards. Notes are removed only when no cards remain elsewhere.</p>
-              <button className="danger-button" type="button" disabled={busy} onClick={() => void removeSelectedDeck()}>Delete deck</button>
-            </div>
-          )}
+          <div className="panel form-panel deck-management-delete">
+            <div className="form-heading"><strong>Delete deck</strong><span>{selectedDeck.totalCards} cards including subdecks</span></div>
+            <p className="muted">Deleting a deck also deletes its subdecks and cards. Notes are removed only when no cards remain elsewhere.</p>
+            <button className="danger-button" type="button" disabled={busy} onClick={() => void removeSelectedDeck()}>Delete deck</button>
+          </div>
         </section>
       )}
 
       {screen === "deck-options" && selectedDeck && (
         <DeckOptionsEditor deck={selectedDeck} onChanged={async () => { await refreshDecks(); }} />
       )}
-
-      {screen === "deck" && selectedDeck && (() => {
-        const dueToday = selectedDeck.newCount + selectedDeck.learningCount + selectedDeck.reviewCount;
-        const masteredCount = Math.max(0, selectedDeck.totalCards - selectedDeck.newCount - selectedDeck.learningCount - selectedDeck.reviewCount);
-        const subdecks = state.decks.filter((d) => d.id !== selectedDeck.id && d.name.toLocaleLowerCase().startsWith(`${selectedDeck.name.toLocaleLowerCase()}::`) && d.name.split("::").length === selectedDeck.name.split("::").length + 1);
-        const total = selectedDeck.totalCards || 1;
-        const newPct = (selectedDeck.newCount / total) * 100;
-        const learnPct = (selectedDeck.learningCount / total) * 100;
-        const reviewPct = (selectedDeck.reviewCount / total) * 100;
-        const masteredPct = (masteredCount / total) * 100;
-        // SVG donut chart values (circumference = 2 * π * 54 ≈ 339.29)
-        const C = 339.29;
-        const seg1 = (newPct / 100) * C;
-        const seg2 = (learnPct / 100) * C;
-        const seg3 = (reviewPct / 100) * C;
-        const seg4 = (masteredPct / 100) * C;
-        return (
-        <section className="deck-overview">
-          {/* Hero: Card composition ring + study CTA */}
-          <div className="deck-hero">
-            <div className="deck-ring-container" aria-hidden="true">
-              <svg className="deck-ring" viewBox="0 0 120 120">
-                {selectedDeck.totalCards > 0 ? (<>
-                  <circle className="deck-ring-segment deck-ring-new" cx="60" cy="60" r="54"
-                    strokeDasharray={`${seg1} ${C - seg1}`} strokeDashoffset="0" />
-                  <circle className="deck-ring-segment deck-ring-learn" cx="60" cy="60" r="54"
-                    strokeDasharray={`${seg2} ${C - seg2}`} strokeDashoffset={`${-seg1}`} />
-                  <circle className="deck-ring-segment deck-ring-review" cx="60" cy="60" r="54"
-                    strokeDasharray={`${seg3} ${C - seg3}`} strokeDashoffset={`${-(seg1 + seg2)}`} />
-                  <circle className="deck-ring-segment deck-ring-mastered" cx="60" cy="60" r="54"
-                    strokeDasharray={`${seg4} ${C - seg4}`} strokeDashoffset={`${-(seg1 + seg2 + seg3)}`} />
-                </>) : (
-                  <circle className="deck-ring-empty" cx="60" cy="60" r="54" />
-                )}
-              </svg>
-              <div className="deck-ring-center">
-                <span className="deck-ring-number">{selectedDeck.totalCards}</span>
-                <span className="deck-ring-label">{selectedDeck.totalCards === 1 ? "card" : "cards"}</span>
-              </div>
-            </div>
-            <div className="deck-hero-cta">
-              {dueToday > 0 ? (
-                <p className="deck-due-summary"><strong>{dueToday}</strong> {dueToday === 1 ? "card" : "cards"} due today</p>
-              ) : selectedDeck.totalCards > 0 ? (
-                <p className="deck-due-summary deck-due-none">No cards due — you&apos;re all caught up! 🎉</p>
-              ) : null}
-              <button className="primary-button study-button" type="button" disabled={busy || selectedDeck.totalCards === 0} onClick={beginStudy}>{busy ? "Opening…" : "Study now"}</button>
-            </div>
-          </div>
-
-          {/* Queue breakdown cards */}
-          <div className="deck-queue-grid" aria-label={`${selectedDeck.newCount} new cards, ${selectedDeck.learningCount} learning cards, ${selectedDeck.reviewCount} cards to review`}>
-            <div className="deck-queue-card deck-queue-new">
-              <div className="deck-queue-icon" aria-hidden="true">
-                <svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-              </div>
-              <div className="deck-queue-info">
-                <span className="deck-queue-count">{selectedDeck.newCount}</span>
-                <span className="deck-queue-label">New</span>
-              </div>
-            </div>
-            <div className="deck-queue-card deck-queue-learning">
-              <div className="deck-queue-icon" aria-hidden="true">
-                <svg viewBox="0 0 20 20" fill="none"><path d="M10 3a7 7 0 1 1 0 14 7 7 0 0 1 0-14Z" stroke="currentColor" strokeWidth="1.6"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </div>
-              <div className="deck-queue-info">
-                <span className="deck-queue-count">{selectedDeck.learningCount}</span>
-                <span className="deck-queue-label">Learning</span>
-              </div>
-            </div>
-            <div className="deck-queue-card deck-queue-review">
-              <div className="deck-queue-icon" aria-hidden="true">
-                <svg viewBox="0 0 20 20" fill="none"><path d="M4 10.5l4 4 8-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </div>
-              <div className="deck-queue-info">
-                <span className="deck-queue-count">{selectedDeck.reviewCount}</span>
-                <span className="deck-queue-label">Review</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card composition legend */}
-          {selectedDeck.totalCards > 0 && (
-            <div className="deck-composition">
-              <h3 className="deck-section-title">Card composition</h3>
-              <div className="deck-comp-bar" aria-hidden="true">
-                {newPct > 0 && <div className="deck-comp-seg deck-comp-new" style={{ width: `${Math.max(newPct, 2)}%` }} />}
-                {learnPct > 0 && <div className="deck-comp-seg deck-comp-learn" style={{ width: `${Math.max(learnPct, 2)}%` }} />}
-                {reviewPct > 0 && <div className="deck-comp-seg deck-comp-review" style={{ width: `${Math.max(reviewPct, 2)}%` }} />}
-                {masteredPct > 0 && <div className="deck-comp-seg deck-comp-mastered" style={{ width: `${Math.max(masteredPct, 2)}%` }} />}
-              </div>
-              <div className="deck-comp-legend">
-                <span><span className="deck-comp-dot deck-comp-new" />New · {selectedDeck.newCount}</span>
-                <span><span className="deck-comp-dot deck-comp-learn" />Learning · {selectedDeck.learningCount}</span>
-                <span><span className="deck-comp-dot deck-comp-review" />Review · {selectedDeck.reviewCount}</span>
-                <span><span className="deck-comp-dot deck-comp-mastered" />Mastered · {masteredCount}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Subdecks */}
-          {subdecks.length > 0 && (
-            <div className="deck-subdecks">
-              <h3 className="deck-section-title">Subdecks</h3>
-              <div className="deck-subdeck-list">
-                {subdecks.map((sub) => (
-                  <button className="deck-subdeck-row" key={sub.id} type="button" onClick={() => goToDeck(sub.id)}>
-                    <span className="deck-subdeck-name">{leafDeckName(sub.name)}</span>
-                    <span className="deck-subdeck-counts">
-                      <span className="new-count">{sub.newCount}</span>
-                      <span className="learn-count">{sub.learningCount}</span>
-                      <span className="review-count">{sub.reviewCount}</span>
-                    </span>
-                    <svg className="deck-subdeck-arrow" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7.5 5l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Empty state */}
-          {selectedDeck.totalCards === 0 && (
-            <div className="deck-empty-state">
-              <div className="deck-empty-icon" aria-hidden="true">
-                <svg viewBox="0 0 48 48" fill="none"><rect x="6" y="10" width="36" height="28" rx="4" stroke="currentColor" strokeWidth="2"/><path d="M6 18h36" stroke="currentColor" strokeWidth="2"/><circle cx="16" cy="28" r="3" stroke="currentColor" strokeWidth="1.5"/><path d="M24 26h12M24 31h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-              </div>
-              <h3>No cards yet</h3>
-              <p>Add your first card to start building this deck and begin studying.</p>
-              <button className="secondary-button" type="button" onClick={() => {
-                const initial = state.notetypes.find((notetype) => notetype.id === noteTypeId) ?? state.notetypes[0];
-                if (initial) {
-                  setNoteTypeId(initial.id);
-                  setNoteFields(initial.fields.map(() => ""));
-                }
-                setAttachments([]);
-                setImageOcclusion(emptyImageOcclusionDraft);
-                setScreen("add-note");
-                setActionError(null);
-              }}>
-                <span aria-hidden="true">+ </span>Add your first card
-              </button>
-            </div>
-          )}
-
-          {actionError && <p className="form-error panel" role="alert">{actionError}</p>}
-        </section>
-        );
-      })()}
 
       {screen === "add-note" && selectedDeck && selectedNotetype && (
         <form className="panel form-panel" onSubmit={saveNote}>
@@ -915,7 +771,7 @@ export function LocalCollectionStatus() {
               {reviewNotice && <p className="review-notice" role="status">{reviewNotice}</p>}
               <div className="congratulations-actions">
                 {undoAvailable && <button className="secondary-button" type="button" disabled={busy} aria-keyshortcuts="Z" onClick={() => void undoReview()}>Undo last review</button>}
-                <button className="secondary-button" type="button" onClick={() => selectedDeckId && goToDeck(selectedDeckId)}>Back to deck</button>
+                <button className="secondary-button" type="button" onClick={goToDecks}>Back to decks</button>
               </div>
             </div>
           ) : studyCard ? (
@@ -1015,13 +871,25 @@ export function LocalCollectionStatus() {
 
       {(screen === "decks" || screen === "browse" || screen === "stats" || screen === "settings") && (
         <nav className="bottom-nav" aria-label="Primary navigation">
-          <button className={`nav-item ${screen === "decks" ? "active" : ""}`} aria-current={screen === "decks" ? "page" : undefined} type="button" onClick={goToDecks}>Decks</button>
+          <button className={`nav-item ${screen === "decks" ? "active" : ""}`} aria-current={screen === "decks" ? "page" : undefined} type="button" onClick={goToDecks}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="13" rx="2" /><path d="M7 5h10M9 2h6" /></svg>
+            <span>Decks</span>
+          </button>
           <button className={`nav-item ${screen === "browse" ? "active" : ""}`} aria-current={screen === "browse" ? "page" : undefined} type="button"
-            onClick={() => { setScreen("browse"); setActionError(null); }}>Browse</button>
+            onClick={() => { setScreen("browse"); setActionError(null); }}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
+            <span>Browse</span>
+          </button>
           <button className={`nav-item ${screen === "stats" ? "active" : ""}`} aria-current={screen === "stats" ? "page" : undefined} type="button"
-            onClick={() => { setScreen("stats"); setSelectedDeckId(null); setActionError(null); }}>Stats</button>
+            onClick={() => { setScreen("stats"); setSelectedDeckId(null); setActionError(null); }}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 16v-5M12 16V4M18 16V8" /></svg>
+            <span>Stats</span>
+          </button>
           <button className={`nav-item ${screen === "settings" ? "active" : ""}`} aria-current={screen === "settings" ? "page" : undefined} type="button"
-            onClick={() => { setScreen("settings"); setSelectedDeckId(null); setActionError(null); }}>Settings</button>
+            onClick={() => { setScreen("settings"); setSelectedDeckId(null); setActionError(null); }}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3-.5 2-2 1.2-2-.6-2 3.4L4 10.5v3L2.5 15l2 3.4 2-.6 2 1.2.5 2h4l.5-2 2-1.2 2 .6 2-3.4-1.5-1.5v-3L20 9l-2-3.4-2 .6L14 5l-.5-2Z" /><circle cx="11.25" cy="12" r="3" /></svg>
+            <span>Settings</span>
+          </button>
         </nav>
       )}
     </main></>
