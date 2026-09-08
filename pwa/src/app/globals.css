@@ -2108,6 +2108,15 @@ body { color: var(--text); -webkit-font-smoothing: antialiased; }
   }
 }
 
+/* Answer controls need more horizontal room than a half-width phone card.
+   Keep every detailed statistic readable instead of letting the next panel
+   overflow off-screen. */
+@media (max-width: 600px) {
+  .stats-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 480px) {
   .stats-toolbar {
     grid-template-columns: 1fr auto;
@@ -3059,6 +3068,16 @@ h1 {
 
   .collection-settings .cloud-sync .settings-saved {
     margin-inline: 16px;
+  }
+}
+
+/* Phones can be wider than 600px in landscape. Keyboard controls remain
+   available while reviewing, but their desktop-only preference stays out of
+   the Settings screen on primary touch devices. */
+@media (hover: none) and (pointer: coarse) {
+  .keyboard-preference,
+  .keyboard-shortcut-reference {
+    display: none;
   }
 }
 
