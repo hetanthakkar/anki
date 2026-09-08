@@ -1811,7 +1811,7 @@ h1 {
 .create-deck-button > span { font-size: 22px; font-weight: 400; }
 .storage-banner { border: 0; box-shadow: none; background: transparent; padding: 0 4px 12px; font-size: 12px; }
 .storage-meta { color: var(--text-muted); }
-.deck-list-heading { display: flex; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--border); color: var(--text-muted); background: #f9fafc; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; }
+.deck-list-heading { display: flex; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--border); border-radius: 23px 23px 0 0; color: var(--text-muted); background: #f9fafc; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; }
 .deck-list-heading .deck-counts { font-size: 11px; font-weight: 500; letter-spacing: 0; }
 .deck-row .deck-counts > span { padding: 6px 0; }
 .deck-row .new-count { color: #245cc5; }

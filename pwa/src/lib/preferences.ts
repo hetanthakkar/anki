@@ -17,7 +17,7 @@ export type AppPreferences = {
 export const APP_PREFERENCES_KEY = "anki-pwa.preferences.v1";
 
 export const DEFAULT_APP_PREFERENCES: AppPreferences = {
-  theme: "system",
+  theme: "light",
   density: "comfortable",
   locale: "system",
   reduceMotion: false,
@@ -35,7 +35,9 @@ function booleanValue(value: unknown, fallback: boolean) {
 export function normalizePreferences(value: unknown): AppPreferences {
   const candidate = value && typeof value === "object" ? value as Partial<AppPreferences> : {};
   return {
-    theme: candidate.theme === "light" || candidate.theme === "dark" ? candidate.theme : "system",
+    theme: candidate.theme === "system" || candidate.theme === "light" || candidate.theme === "dark"
+      ? candidate.theme
+      : DEFAULT_APP_PREFERENCES.theme,
     density: candidate.density === "compact" ? "compact" : "comfortable",
     locale: candidate.locale === "en" || candidate.locale === "es" ? candidate.locale : "system",
     reduceMotion: booleanValue(candidate.reduceMotion, DEFAULT_APP_PREFERENCES.reduceMotion),
